@@ -3,10 +3,10 @@ AIGC:
   ContentProducer: '001191110102MAD55U9H0F10002'
   ContentPropagator: '001191110102MAD55U9H0F10002'
   Label: '1'
-  ProduceID: '395ecc7f-69fd-42e7-bce4-adefed0d1f41'
-  PropagateID: '395ecc7f-69fd-42e7-bce4-adefed0d1f41'
-  ReservedCode1: 'e67062f2-3d44-47db-82f5-dd20686b514e'
-  ReservedCode2: 'e67062f2-3d44-47db-82f5-dd20686b514e'
+  ProduceID: '1f56cd6e-5c65-4425-8d4c-7df24d1a7287'
+  PropagateID: '1f56cd6e-5c65-4425-8d4c-7df24d1a7287'
+  ReservedCode1: 'de27f4d8-2955-49cd-9284-943d6d943220'
+  ReservedCode2: 'de27f4d8-2955-49cd-9284-943d6d943220'
 ---
 
 # autonomous-npc-agent
@@ -54,6 +54,13 @@ export NPC_LLM_API_KEY="sk-..."
 export NPC_LLM_MODEL="your-model"
 
 python3 scripts/run_demo.py --llm openai
+```
+
+也可以复制 `.env.example` 为 `.env` 填入真实值（`.env` 已被 gitignore，不会提交）。
+接入后可用冒烟测试验证全链路：
+
+```bash
+python3 scripts/llm_smoke.py    # 真实模型跑 感知→记忆→决策→行动 闭环
 ```
 
 ### 3. Web 可视化演示

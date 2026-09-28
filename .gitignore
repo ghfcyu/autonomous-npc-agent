@@ -29,3 +29,6 @@ data/memory_store/*.local.json
 .env
 .env.*
 !.env.example
+
+# 迭代代理的临时工作区
+.temp/

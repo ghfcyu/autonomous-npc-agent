@@ -15,7 +15,7 @@ from .actions import Action
 from .llm import create_provider
 from .llm.base import BaseLLMProvider
 from .npc import NPC, Persona
-from .world import Entity, World
+from .world import Entity, World, WorldEvent
 
 
 class NPCEngine:
@@ -73,6 +73,31 @@ class NPCEngine:
             "state": npc.state_machine.state.value,
             "clock": self.world.clock,
         }
+
+    # ------------------------------------------------------------------ #
+    def player_gives(self, npc_id: str, item: str) -> Dict[str, Any]:
+        """玩家把物品送给某个 NPC（G1：事件驱动长期记忆入口）。
+
+        无论走哪条路径，最终都会发布一条 actor="player" 的 item_given 事件，
+        目标 NPC 通过既有订阅链路（``NPC._on_event`` → ``MemorySystem.observe``）
+        把这次赠予同时写入短期与长期记忆（importance=0.8 >= 阈值 0.7）。
+        """
+        if npc_id not in self.world.entities:
+            return {"ok": False, "reason": "unknown npc"}
+
+        if self.world.transfer_item("player", npc_id, item):
+            # 真实库存转移，transfer_item 内部已发布 item_given 事件
+            from_inventory = True
+        else:
+            # 宽松模式：玩家库存中没有该物品时不做严格模拟，仅手动发布事件，
+            # 保证 NPC 仍能通过既有链路记住这次赠予。
+            self.world.bus.publish(WorldEvent(
+                self.world.tick_count, "item_given", "player",
+                {"to": npc_id, "item": item}))
+            from_inventory = False
+
+        return {"ok": True, "item": item, "to": npc_id,
+                "from_inventory": from_inventory}
 
     # ------------------------------------------------------------------ #
     def tick(self, minutes: int = 10) -> Dict[str, Any]:

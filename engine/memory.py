@@ -23,6 +23,9 @@ from .world import WorldEvent
 
 SHORT_TERM_CAPACITY = 30
 CONSOLIDATE_BATCH = 8
+# 重要度达到该阈值的事件，在写入短期记忆的同时直接沉淀为长期记忆
+# （如 item_given，importance=0.8），无需等待短期溢出后的 consolidate 压缩。
+LONG_TERM_IMPORTANCE_THRESHOLD = 0.7
 _TOKEN_RE = re.compile(r"[\w\u4e00-\u9fff]+")
 
 
@@ -124,7 +127,7 @@ class MemorySystem:
     # 感知写入
     # ------------------------------------------------------------------ #
     def observe(self, event: WorldEvent) -> None:
-        """把世界事件转写为短期记忆。"""
+        """把世界事件转写为短期记忆；重要度达阈值的事件同时沉淀为长期记忆。"""
         templates = {
             "player_spoke": ("玩家说：{text}", 0.6),
             "item_given": ("收到来自 {actor} 的物品：{item}", 0.8),
@@ -140,6 +143,12 @@ class MemorySystem:
         tags = [event.kind] + list(_tokens(event.actor))[:2]
         self.short.add(MemoryRecord(content=content, tick=event.tick,
                                     importance=importance, tags=tags, kind="interaction"))
+        # 事件驱动长期写入：高价值事件（>= 阈值）直接沉淀为长期记忆，
+        # 保留明细而不等待 consolidate 的有损压缩。
+        if importance >= LONG_TERM_IMPORTANCE_THRESHOLD:
+            self.long.add(MemoryRecord(content=content, tick=event.tick,
+                                       importance=importance, tags=tags,
+                                       kind="interaction"))
 
     # ------------------------------------------------------------------ #
     # 巩固

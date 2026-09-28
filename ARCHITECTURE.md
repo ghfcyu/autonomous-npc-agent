@@ -3,10 +3,10 @@ AIGC:
   ContentProducer: '001191110102MAD55U9H0F10002'
   ContentPropagator: '001191110102MAD55U9H0F10002'
   Label: '1'
-  ProduceID: '4dec22a2-c7fa-4fe4-8ded-b2011b52f7f7'
-  PropagateID: '4dec22a2-c7fa-4fe4-8ded-b2011b52f7f7'
-  ReservedCode1: '133ba91c-ec48-45e1-865b-af850fe414e1'
-  ReservedCode2: '133ba91c-ec48-45e1-865b-af850fe414e1'
+  ProduceID: 'af746f7c-4861-4908-9793-072e56ffe5d8'
+  PropagateID: 'af746f7c-4861-4908-9793-072e56ffe5d8'
+  ReservedCode1: '2883e75b-42a5-4ba7-a15e-7183d76bf3bd'
+  ReservedCode2: '2883e75b-42a5-4ba7-a15e-7183d76bf3bd'
 ---
 
 # 架构设计
@@ -31,6 +31,9 @@ AIGC:
 ### 2. 记忆层（`engine/memory.py`）
 
 ```
+WorldEvent（重要度 ≥ 0.7 的高价值事件）
+        │  observe() 双写：短期记忆 + 直接沉淀长期记忆（保留明细）
+        ▼
 ShortTermMemory (deque, 容量 30)
         │  溢出时 consolidate()
         ▼
@@ -38,6 +41,7 @@ LongTermMemory (JSON 持久化, 检索评分)
 ```
 
 - **记忆条目** `MemoryRecord`：内容 + tick + 重要度(0~1) + 标签 + 类型
+- **事件驱动直写**：`MemorySystem.observe` 中，转写重要度 ≥ `LONG_TERM_IMPORTANCE_THRESHOLD`(0.7) 的事件（知 `item_given`）在写短期的同时直写一条带标签的长期记忆——送礼这类关键互动不依赖有损巩固，NPC 会记得每一次赠予
 - **检索评分**：`score = 2×标签重合 + 关键词重合 + 重要度 + 时间衰减`，纯标准库实现；接口已抽象，L2 可整体替换为向量检索
 - **巩固（consolidate）**：短期记忆满时，把最旧的一批按行为主题压缩成摘要条目写入长期记忆——这是 NPC"记得你上次来过"的机制基础
 
@@ -73,7 +77,7 @@ LongTermMemory (JSON 持久化, 检索评分)
 
 - `Persona`：JSON 配置 → 人格对象（性格、背景、语气、对话库、作息表）
 - `NPC`：人格 + 记忆系统 + 状态机 + 决策引擎的聚合根，订阅事件总线
-- `NPCEngine`：世界 + NPC 集合的编排入口，暴露 `player_says / tick / status` 三个核心 API
+- `NPCEngine`：世界 + NPC 集合的编排入口，暴露 `player_says / player_gives / tick / status` 四个核心 API（`player_gives`：玩家送礼，库存转移或宽松发布事件，NPC 经事件链路记入短期+长期记忆）
 
 ## 数据流（一次对话）
 
@@ -88,6 +92,18 @@ LongTermMemory (JSON 持久化, 检索评分)
       → ActionValidator：白名单 + 一致性校验 ✓
   → ActionExecutor 执行 → 世界事件 npc_action → 玩家收到回复
   → 记忆层沉淀本次交互 → 短期记忆超限则触发巩固
+```
+
+## 数据流（一次送礼）
+
+```
+玩家送铁矿石给铁匠陈
+  → NPCEngine.player_gives("chen", "铁矿石")
+  → 玩家背包有则 transfer_item（自动发事件）；无则宽松发布 item_given 事件
+  → NPC._on_event 命中自己 → MemorySystem.observe
+      → importance 0.8 ≥ 阈值 0.7 → 短期记忆 + 长期记忆双写（tags 含 item_given/玩家）
+  → 下次对话时 context_for("铁矿石") 命中该长期记忆 → 进入决策上下文
+     → "上次你给我的那块铁矿石，打成好钢了"这类回应有了记忆地基
 ```
 
 ## 工程约定

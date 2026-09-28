@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>autonomous-npc-agent · AI NPC 引擎演示</title>
+<style>
+  :root {
+    --primary: #3b82f6;
+    --primary-light: #eff6ff;
+    --border: #e5e7eb;
+    --text: #1f2937;
+    --text-soft: #6b7280;
+    --bg: #fafbfc;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--text);
+    display: flex; height: 100vh; overflow: hidden;
+  }
+  header {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+    background: rgba(255,255,255,.85); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 20px; display: flex; align-items: center; gap: 16px;
+  }
+  header h1 { font-size: 15px; font-weight: 600; }
+  header h1 span { color: var(--primary); }
+  .hud { display: flex; gap: 12px; font-size: 12px; color: var(--text-soft); margin-left: auto; }
+  .hud b { color: var(--text); font-weight: 600; }
+  .btn {
+    border: 1px solid var(--border); background: #fff; border-radius: 8px;
+    padding: 5px 14px; font-size: 12px; cursor: pointer; color: var(--text);
+    transition: all .15s;
+  }
+  .btn:hover { border-color: var(--primary); color: var(--primary); }
+  .btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .btn.primary:hover { background: #2563eb; }
+
+  main { display: flex; flex: 1; margin-top: 46px; width: 100%; }
+
+  /* 左：地图 */
+  #map-pane { flex: 1.2; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+  #map-wrap {
+    flex: 1; background: #fff; border: 1px solid var(--border); border-radius: 14px;
+    position: relative; overflow: hidden;
+  }
+  canvas { display: block; width: 100%; height: 100%; }
+  #npc-cards { display: flex; gap: 10px; }
+  .npc-card {
+    flex: 1; background: #fff; border: 1px solid var(--border); border-radius: 12px;
+    padding: 10px 12px; cursor: pointer; transition: all .15s;
+  }
+  .npc-card:hover, .npc-card.active { border-color: var(--primary); background: var(--primary-light); }
+  .npc-card h3 { font-size: 13px; margin-bottom: 3px; }
+  .npc-card p { font-size: 11px; color: var(--text-soft); }
+  .npc-card .state {
+    display: inline-block; font-size: 10px; padding: 1px 8px; border-radius: 99px;
+    background: var(--primary-light); color: var(--primary); margin-left: 6px;
+  }
+
+  /* 右：对话与事件 */
+  #chat-pane { flex: 1; max-width: 420px; display: flex; flex-direction: column; padding: 20px 20px 20px 0; gap: 12px; }
+  #chat-box {
+    flex: 1; background: #fff; border: 1px solid var(--border); border-radius: 14px;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  #chat-log { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .msg { max-width: 82%; padding: 8px 12px; border-radius: 12px; font-size: 13px; line-height: 1.55; }
+  .msg.me { align-self: flex-end; background: var(--primary); color: #fff; border-bottom-right-radius: 4px; }
+  .msg.npc { align-self: flex-start; background: #f3f4f6; border-bottom-left-radius: 4px; }
+  .msg.npc b { color: var(--primary); font-size: 11px; display: block; margin-bottom: 2px; }
+  .msg.sys { align-self: center; color: var(--text-soft); font-size: 11px; background: none; }
+  #chat-input {
+    display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--border);
+  }
+  #chat-input input {
+    flex: 1; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px;
+    font-size: 13px; outline: none;
+  }
+  #chat-input input:focus { border-color: var(--primary); }
+  #event-box {
+    height: 150px; background: #fff; border: 1px solid var(--border); border-radius: 14px;
+    padding: 10px 14px; overflow-y: auto; font-size: 11px; color: var(--text-soft);
+    font-family: ui-monospace, Menlo, monospace;
+  }
+  #event-box h4 { font-size: 11px; color: var(--text); margin-bottom: 6px; font-family: inherit; }
+  #event-box .ev { padding: 2px 0; border-bottom: 1px dashed #f0f0f0; }
+  #event-box .ev em { color: var(--primary); font-style: normal; }
+
+  .hint { font-size: 11px; color: var(--text-soft); }
+</style>
+</head>
+<body>
+<header>
+  <h1>autonomous<span>-npc-agent</span> 引擎演示</h1>
+  <div class="hud">
+    <div>时间 <b id="hud-clock">--:--</b></div>
+    <div>天气 <b id="hud-weather">--</b></div>
+    <button class="btn" id="btn-tick">推进时间 +10min</button>
+    <button class="btn" id="btn-auto">自动流逝</button>
+  </div>
+</header>
+
+<main>
+  <section id="map-pane">
+    <div id="map-wrap"><canvas id="map"></canvas></div>
+    <div id="npc-cards"></div>
+    <p class="hint">点击地图上的 NPC 或下方卡片选择对话对象；点击地点可移动过去。</p>
+  </section>
+
+  <section id="chat-pane">
+    <div id="chat-box">
+      <div id="chat-log"></div>
+      <div id="chat-input">
+        <input id="msg" placeholder="对 NPC 说点什么…（回车发送）" disabled>
+        <button class="btn primary" id="btn-send" disabled>发送</button>
+      </div>
+    </div>
+    <div id="event-box"><h4>世界事件流（感知层）</h4><div id="events"></div></div>
+  </section>
+</main>
+
+<script>
+const WEATHER_CN = {sunny: "晴", cloudy: "阴", rain: "雨", snow: "雪"};
+const state = { world: null, npcs: [], selected: null, autoTimer: null, seenEvents: new Set() };
+
+const $ = id => document.getElementById(id);
+const log = (html, cls) => {
+  const div = document.createElement("div");
+  div.className = "msg " + cls; div.innerHTML = html;
+  $("chat-log").appendChild(div);
+  $("chat-log").scrollTop = 1e9;
+};
+
+async function api(path, body) {
+  const res = await fetch(path, body ? {
+    method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)
+  } : undefined);
+  return res.json();
+}
+
+async function refresh() {
+  const s = await api("/api/status");
+  state.world = s.world; state.npcs = s.npcs;
+  $("hud-clock").textContent = s.world.clock;
+  $("hud-weather").textContent = WEATHER_CN[s.world.weather] || s.world.weather;
+  renderCards(); renderMap();
+  for (const e of s.recent_events) {
+    const key = e.tick + ":" + e.kind + ":" + e.actor + ":" + (e.summary || "");
+    if (state.seenEvents.has(key)) continue;
+    state.seenEvents.add(key);
+    const div = document.createElement("div");
+    div.className = "ev";
+    div.innerHTML = `[${e.tick}] <em>${e.actor}</em> · ${e.kind} · ${e.summary || ""}`;
+    $("events").prepend(div);
+  }
+}
+
+function selectNpc(id) {
+  state.selected = id;
+  $("msg").disabled = false; $("btn-send").disabled = false;
+  const npc = state.npcs.find(n => n.id === id);
+  $("msg").placeholder = `对 ${npc ? npc.name : id} 说点什么…`;
+  renderCards();
+}
+
+function renderCards() {
+  const box = $("npc-cards"); box.innerHTML = "";
+  for (const npc of state.npcs) {
+    const card = document.createElement("div");
+    card.className = "npc-card" + (state.selected === npc.id ? " active" : "");
+    card.onclick = () => selectNpc(npc.id);
+    card.innerHTML = `<h3>${npc.name}<span class="state">${npc.state}</span></h3>
+      <p>${npc.role} · 短期记忆 ${npc.memory_size.short} / 长期 ${npc.memory_size.long}</p>`;
+    box.appendChild(card);
+  }
+}
+
+/* ---------------- 2D 地图 ---------------- */
+const cv = $("map"), ctx = cv.getContext("2d");
+function renderMap() {
+  const w = cv.width = cv.clientWidth * devicePixelRatio;
+  const h = cv.height = cv.clientHeight * devicePixelRatio;
+  const sx = w / 500, sy = h / 340;
+  ctx.clearRect(0, 0, w, h);
+
+  for (const loc of state.world.locations) {
+    const x = loc.x * sx, y = loc.y * sy;
+    ctx.fillStyle = "#eff6ff"; ctx.strokeStyle = "#bfdbfe";
+    roundRect(x - 55 * sx, y - 38 * sy, 110 * sx, 76 * sy, 14);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#1f2937"; ctx.font = `${12 * devicePixelRatio}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.fillText(loc.name, x, y + 34 * sy);
+    for (const e of loc.entities) {
+      const isPlayer = e === "旅行者";
+      const npc = state.npcs.find(n => n.name === e);
+      const px = x + (isPlayer ? -14 : 14) * sx, py = y + (isPlayer ? 8 : 8) * sy;
+      ctx.beginPath(); ctx.arc(px, py, 10 * devicePixelRatio, 0, Math.PI * 2);
+      ctx.fillStyle = isPlayer ? "#3b82f6" : (state.selected && npc && npc.id === state.selected ? "#f59e0b" : "#94a3b8");
+      ctx.fill();
+      ctx.fillStyle = "#fff"; ctx.font = `${9 * devicePixelRatio}px sans-serif`;
+      ctx.fillText(isPlayer ? "你" : (npc ? npc.name[0] : "?"), px, py + 3 * devicePixelRatio);
+    }
+  }
+}
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+cv.addEventListener("click", async ev => {
+  const rect = cv.getBoundingClientRect();
+  const mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
+  for (const loc of state.world.locations) {
+    const dx = mx - loc.x / 500 * rect.width, dy = my - loc.y / 340 * rect.height;
+    if (Math.abs(dx) < 60 && Math.abs(dy) < 45) {
+      await api("/api/move", {location_id: loc.id});
+      log(`你走到了 ${loc.name}`, "sys");
+      refresh(); return;
+    }
+  }
+});
+
+/* ---------------- 对话 ---------------- */
+async function send() {
+  const text = $("msg").value.trim();
+  if (!text || !state.selected) return;
+  $("msg").value = "";
+  log(text.replace(/</g, "&lt;"), "me");
+  const r = await api("/api/talk", {npc_id: state.selected, text});
+  if (r.ok) log(`<b>${r.npc} · ${r.state}</b>${(r.reply || "").replace(/</g, "&lt;")}`, "npc");
+  else log(r.error || "对话失败", "sys");
+  refresh();
+}
+$("btn-send").onclick = send;
+$("msg").addEventListener("keydown", e => { if (e.key === "Enter") send(); });
+
+$("btn-tick").onclick = async () => { await api("/api/tick", {minutes: 60}); refresh(); };
+$("btn-auto").onclick = () => {
+  if (state.autoTimer) {
+    clearInterval(state.autoTimer); state.autoTimer = null;
+    $("btn-auto").textContent = "自动流逝"; $("btn-auto").classList.remove("primary");
+  } else {
+    state.autoTimer = setInterval(async () => { await api("/api/tick", {minutes: 30}); refresh(); }, 2000);
+    $("btn-auto").textContent = "停止流逝"; $("btn-auto").classList.add("primary");
+  }
+};
+
+log("欢迎来到这座小镇。点击地图上的 NPC 开始对话，试着把时间推到夜里 20:00 后再找他们——看看记忆和作息怎么工作。", "sys");
+refresh(); setInterval(refresh, 3000);
+</script>
+</body>
+</html>

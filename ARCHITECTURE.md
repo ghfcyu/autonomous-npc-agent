@@ -3,10 +3,10 @@ AIGC:
   ContentProducer: '001191110102MAD55U9H0F10002'
   ContentPropagator: '001191110102MAD55U9H0F10002'
   Label: '1'
-  ProduceID: '568d83cf-0d72-4cb3-bbf3-4420ee70d105'
-  PropagateID: '568d83cf-0d72-4cb3-bbf3-4420ee70d105'
-  ReservedCode1: '7436c74d-99b4-4862-9956-b5b51474ebd0'
-  ReservedCode2: '7436c74d-99b4-4862-9956-b5b51474ebd0'
+  ProduceID: '4dec22a2-c7fa-4fe4-8ded-b2011b52f7f7'
+  PropagateID: '4dec22a2-c7fa-4fe4-8ded-b2011b52f7f7'
+  ReservedCode1: '133ba91c-ec48-45e1-865b-af850fe414e1'
+  ReservedCode2: '133ba91c-ec48-45e1-865b-af850fe414e1'
 ---
 
 # 架构设计
@@ -96,6 +96,14 @@ LongTermMemory (JSON 持久化, 检索评分)
 - 核心引擎**仅标准库**（unittest 测试，无需 pytest）
 - 所有 LLM 交互必须可降级：任何异常都不能中断游戏循环
 - 配置与代码分离：新 NPC = 新增一个 JSON 文件
+
+## 自主迭代系统（多 Agent 协作）
+
+项目由一套定时驱动的自主迭代系统持续演进（GAN 式对抗 + PM 协作）：
+
+- **每日 20:00 迭代（PM 模式）**：主会话作为产品经理，通过 Task 工具派子代理协作——explore 型调研代码影响面，general 型实现功能/写测试（可并行）。PM 不亲自写实现代码，负责任务分解、自包含任务书撰写、验收（亲自跑测试、读 diff）、整合提交。红线：子代理产出必须 PM 亲自验证后才可入库；Task 不可用时降级为单兵模式。
+- **每三天 22:00 审查（判别器）**：以"默认不合格"立场审查，可派 explore 子代理并行收集证据，但评级与批判必须主审者亲自出。含主人指令核对、数据一致性核查、对抗升级机制。
+- **共享状态**：PROGRESS.md（北极星+目标状态机+主人指令）、iteration-log/（逐日日志）、reviews/（批判报告）构成跨会话共享内存；桌面 log/ 生成面向项目主人的监督简报。
 
 ## 已知边界（当前 MVP 的取舍）
 

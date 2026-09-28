@@ -24,3 +24,8 @@ htmlcov/
 # Project runtime artifacts
 data/memory_store/*.local.json
 *.log
+
+# 本地密钥与环境配置（严禁提交到公开仓库）
+.env
+.env.*
+!.env.example

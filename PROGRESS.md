@@ -3,10 +3,10 @@ AIGC:
   ContentProducer: '001191110102MAD55U9H0F10002'
   ContentPropagator: '001191110102MAD55U9H0F10002'
   Label: '1'
-  ProduceID: 'f788f3de-c7b0-4ed1-a24e-8ab9c0bdd29e'
-  PropagateID: 'f788f3de-c7b0-4ed1-a24e-8ab9c0bdd29e'
-  ReservedCode1: '0d764834-0a12-4765-945c-89b95a75b53e'
-  ReservedCode2: '0d764834-0a12-4765-945c-89b95a75b53e'
+  ProduceID: 'a6ccaf08-3cf3-4fce-a4a2-8cd6eb1a7111'
+  PropagateID: 'a6ccaf08-3cf3-4fce-a4a2-8cd6eb1a7111'
+  ReservedCode1: '43f576d5-dfec-4ab3-bb2d-b8e207662f39'
+  ReservedCode2: '43f576d5-dfec-4ab3-bb2d-b8e207662f39'
 ---
 
 # 项目迭代进度（自主迭代状态机）
@@ -27,8 +27,8 @@ AIGC:
 
 ## 项目周期
 
-- 开始：2026-09-29
-- 结束：2026-10-28（共 30 天）
+- 开始：2026-09-28（主人提前手动启动首次迭代）
+- 结束：2026-10-28
 - 仓库：https://github.com/ghfcyu/autonomous-npc-agent
 
 ## 总目标（一个月完成，均为通往终极目标的里程碑）
@@ -72,7 +72,7 @@ AIGC:
   2. 相关长期记忆能被 `context_for` 检索命中并进入决策上下文（有测试断言）
   3. 全部测试通过
 - **状态**：🔄 进行中
-- **开始日期**：2026-09-29（首个迭代日）
+- **开始日期**：2026-09-28（首个迭代日，主人提前启动）
 
 ## 已完成目标
 

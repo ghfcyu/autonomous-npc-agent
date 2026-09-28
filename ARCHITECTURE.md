@@ -3,10 +3,10 @@ AIGC:
   ContentProducer: '001191110102MAD55U9H0F10002'
   ContentPropagator: '001191110102MAD55U9H0F10002'
   Label: '1'
-  ProduceID: 'af746f7c-4861-4908-9793-072e56ffe5d8'
-  PropagateID: 'af746f7c-4861-4908-9793-072e56ffe5d8'
-  ReservedCode1: '2883e75b-42a5-4ba7-a15e-7183d76bf3bd'
-  ReservedCode2: '2883e75b-42a5-4ba7-a15e-7183d76bf3bd'
+  ProduceID: '1c3daeec-694e-4320-b0c6-d67cc05dfa64'
+  PropagateID: '1c3daeec-694e-4320-b0c6-d67cc05dfa64'
+  ReservedCode1: '64734dbb-1ec0-4b17-b48a-accb8c35be3d'
+  ReservedCode2: '64734dbb-1ec0-4b17-b48a-accb8c35be3d'
 ---
 
 # 架构设计
@@ -45,6 +45,30 @@ LongTermMemory (JSON 持久化, 检索评分)
 - **检索评分**：`score = 2×标签重合 + 关键词重合 + 重要度 + 时间衰减`，纯标准库实现；接口已抽象，L2 可整体替换为向量检索
 - **巩固（consolidate）**：短期记忆满时，把最旧的一批按行为主题压缩成摘要条目写入长期记忆——这是 NPC"记得你上次来过"的机制基础
 
+### 2.5 内状态层（`engine/inner_state.py`）
+
+```
+WorldEvent（事件总线发布）
+        │  StateUpdater.on_event()（catch-all 订阅者）
+        ▼
+规则引擎（按事件 kind + 标签 加成 计算确定性增量）
+        │
+        ▼
+InnerState（arousal/mood/energy/stress/trust，值域 [0,1]）
+        │
+        ├─→ to_prompt_text() → 注入决策上下文【此刻内心】
+        └─→ decide() 硬约束检查（stress>0.8 拒绝 / energy<0.15 收摊）
+```
+
+- **InnerState**：5 维心理参数向量（兴奋度/心情/精力/压力/信任），`apply_delta` 自动 clamp 到 [0,1]
+- **StateUpdater**：作为 EventBus 的第二个 catch-all 订阅者（第一个是 NPC._on_event 写记忆），按确定性规则更新参数：
+  - `item_given` → trust+0.1, mood+0.05, stress-0.05（守财标签额外加成 trust）
+  - `player_spoke` → arousal+0.05, stress+0.05（较为自负标签对赞美/批评放大效应）
+  - `npc_action` → energy-0.02, arousal-0.01
+  - `time_passed` → SLEEPING 时 energy+0.05/stress-0.02；否则 energy-0.01
+- **标签系统**：Persona.tags（Dict[str, float]），如 {"较为自负": 0.7}。标签在 StateUpdater 中可推断地影响参数增量幅度，并在 system prompt 中注入供 LLM 柔性调整说话风格
+- **硬约束**：decide() 在 LLM 调用前检查 stress/energy 阈值——压力过高自动 REFUSE（不接单），精力过低自动 REFUSE（提前收摊），与 SLEEPING 硬规则同级
+
 ### 3. 决策层（`engine/decision.py`）
 
 **混合决策**是本项目最重要的设计决策：
@@ -52,14 +76,16 @@ LongTermMemory (JSON 持久化, 检索评分)
 | 组件 | 职责 | 为什么 |
 |---|---|---|
 | `StateMachine` | 状态迁移硬约束（IDLE/WORKING/TALKING/SLEEPING） | 确定性、可测试、防 LLM 越权 |
-| `DecisionEngine` | 组装上下文 → 调 LLM → 解析动作 | 柔性、个性化、自然语言 |
+| `InnerState` | 内状态硬约束（stress>0.8 拒绝、energy<0.15 收摊） | 心理参数驱动行为边界 |
+| `DecisionEngine` | 组装上下文（含内状态）→ 调 LLM → 解析动作 | 柔性、个性化、自然语言 |
 
 决策流程：
 
 1. 硬规则前置：当前状态是否允许对话？（SLEEPING → 直接产出"睡梦中嘟囔"的回退动作）
-2. 上下文组装：人格卡 + 相关长期记忆 + 短期记忆 + 世界快照 + 玩家输入 + **输出 JSON 契约**
-3. LLM 生成结构化动作
-4. 校验失败/解析异常 → 人格自带的 `fallback_bank` 安全回退
+2. 内状态硬约束：压力 > 0.8 → 拒绝接单；精力 < 0.15 → 提前收摊
+3. 上下文组装：人格卡 + 性格标签 + 相关长期记忆 + 短期记忆 + 世界快照 + **此刻内心状态** + 玩家输入 + 输出 JSON 契约
+4. LLM 生成结构化动作
+5. 校验失败/解析异常 → 人格自带的 `fallback_bank` 安全回退
 
 ### 4. 行动层（`engine/actions.py`）
 
@@ -75,8 +101,8 @@ LongTermMemory (JSON 持久化, 检索评分)
 
 ### 6. 编排层（`engine/engine.py` + `engine/npc.py`）
 
-- `Persona`：JSON 配置 → 人格对象（性格、背景、语气、对话库、作息表）
-- `NPC`：人格 + 记忆系统 + 状态机 + 决策引擎的聚合根，订阅事件总线
+- `Persona`：JSON 配置 → 人格对象（性格、背景、语气、对话库、作息表、**标签**）
+- `NPC`：人格 + 记忆系统 + 状态机 + 决策引擎 + **内状态** 的聚合根，订阅事件总线（记忆写入 + 状态更新双订阅）
 - `NPCEngine`：世界 + NPC 集合的编排入口，暴露 `player_says / player_gives / tick / status` 四个核心 API（`player_gives`：玩家送礼，库存转移或宽松发布事件，NPC 经事件链路记入短期+长期记忆）
 
 ## 数据流（一次对话）
@@ -84,13 +110,16 @@ LongTermMemory (JSON 持久化, 检索评分)
 ```
 玩家输入 "能帮我打一把剑吗？"
   → NPCEngine.player_says()
-  → World 发布 player_spoke 事件 → NPC.perceive() 写入短期记忆
+  → World 发布 player_spoke 事件
+      → NPC._on_event 写入短期记忆
+      → StateUpdater.on_event 更新内状态（arousal+0.05, stress+0.05）
   → NPC.handle_player_input()
       → StateMachine 检查：WORKING 状态允许 TALKING ✓
+      → InnerState 硬约束检查：stress ≤ 0.8 且 energy ≥ 0.15 ✓
       → MemorySystem.context_for("打剑") 检索相关长期记忆
-      → DecisionEngine：组装 prompt → LLM → {"action":"speak","text":"..."}
+      → DecisionEngine：组装 prompt（含【此刻内心】状态行）→ LLM → {"action":"speak","text":"..."}
       → ActionValidator：白名单 + 一致性校验 ✓
-  → ActionExecutor 执行 → 世界事件 npc_action → 玩家收到回复
+  → ActionExecutor 执行 → 世界事件 npc_action → StateUpdater 更新内状态（energy-0.02）
   → 记忆层沉淀本次交互 → 短期记忆超限则触发巩固
 ```
 

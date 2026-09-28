@@ -49,26 +49,35 @@ class DecisionEngine:
             "fallback_bank": p.fallback_bank,
             "topic_responses": p.topic_responses,
         }
+        tag_line = ""
+        if p.tags:
+            tag_line = f"\n性格标签：{'、'.join(f'{k}({v})' for k, v in p.tags.items())}"
         return (
             f"<!--persona:{p.id}-->\n"
             f"你是游戏里的 NPC「{p.name}」，职业：{p.role}。\n"
             f"性格：{p.personality}\n"
             f"说话风格：{p.speech_style}\n"
             f"背景：{p.backstory}\n"
-            f"喜欢：{'、'.join(p.likes)}；讨厌：{'、'.join(p.dislikes)}\n\n"
+            f"喜欢：{'、'.join(p.likes)}；讨厌：{'、'.join(p.dislikes)}\n"
+            f"{tag_line}\n\n"
             f"{OUTPUT_CONTRACT}\n"
             f"<<<banks>>>{json.dumps(banks, ensure_ascii=False)}"
         )
 
     def _user_prompt(self, player_input: str, world: World,
-                     memory_ctx: Dict[str, list], snapshot: Dict[str, Any]) -> str:
+                     memory_ctx: Dict[str, list], snapshot: Dict[str, Any],
+                     inner_state=None) -> str:
         long_term = "\n".join(f"- {m}" for m in memory_ctx.get("long_term", [])) or "（无）"
         recent = "\n".join(f"- {m}" for m in memory_ctx.get("recent", [])) or "（无）"
+        state_line = ""
+        if inner_state is not None:
+            state_line = f"【此刻内心】{inner_state.to_prompt_text()}\n"
         return (
             f"【相关长期记忆】\n{long_term}\n\n"
             f"【最近的经历】\n{recent}\n\n"
             f"【当前世界】时间 {snapshot.get('clock')}，天气 {snapshot.get('weather')}，"
             f"你在 {snapshot.get('my_location')}\n"
+            f"{state_line}"
             f"【玩家说】{player_input}"
         )
 
@@ -76,17 +85,24 @@ class DecisionEngine:
     # 主入口
     # ------------------------------------------------------------------ #
     def decide(self, npc, world: World, player_input: str) -> Action:
-        sm: StateMachine = npc.state_machine
+        sm = npc.state_machine
 
         # 1) 硬规则：睡觉 → 梦呓回退，不消耗 LLM
         if sm.blocks_speech():
             return Action(ActionType.SPEAK, {"text": self.persona.sleep_mumble})
 
+        # 1.5) 硬规则：内状态硬约束（压力过高拒绝接单，精力过低提前收摊）
+        istate = npc.inner_state
+        if istate.stress > 0.8:
+            return Action(ActionType.REFUSE, {"reason": "stress_too_high"})
+        if istate.energy < 0.15:
+            return Action(ActionType.REFUSE, {"reason": "energy_too_low"})
+
         memory_ctx = npc.memory.context_for(player_input)
         snapshot = world.snapshot(npc.persona.id)
         messages = [
             {"role": "system", "content": self._system_prompt()},
-            {"role": "user", "content": self._user_prompt(player_input, world, memory_ctx, snapshot)},
+            {"role": "user", "content": self._user_prompt(player_input, world, memory_ctx, snapshot, npc.inner_state)},
         ]
 
         # 2) LLM 生成 + 解析

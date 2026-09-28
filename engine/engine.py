@@ -82,7 +82,7 @@ class NPCEngine:
         目标 NPC 通过既有订阅链路（``NPC._on_event`` → ``MemorySystem.observe``）
         把这次赠予同时写入短期与长期记忆（importance=0.8 >= 阈值 0.7）。
         """
-        if npc_id not in self.world.entities:
+        if npc_id not in self.npcs:
             return {"ok": False, "reason": "unknown npc"}
 
         if self.world.transfer_item("player", npc_id, item):

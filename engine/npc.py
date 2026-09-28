@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from .actions import Action, ActionExecutor
+from .inner_state import InnerState, StateUpdater
 from .decision import DecisionEngine
 from .llm.base import BaseLLMProvider
 from .memory import MemorySystem
@@ -36,6 +37,7 @@ class Persona:
     sleep_mumble: str = "（呼呼大睡）"
     schedule: Dict[str, str] = field(default_factory=dict)
     topic_responses: Dict[str, List[str]] = field(default_factory=dict)
+    tags: Dict[str, float] = field(default_factory=dict)
 
     @classmethod
     def from_file(cls, path: str) -> "Persona":
@@ -71,7 +73,7 @@ class Persona:
     def to_dict(self) -> Dict[str, Any]:
         return {"id": self.id, "name": self.name, "role": self.role,
                 "location_id": self.location_id, "personality": self.personality,
-                "speech_style": self.speech_style}
+                "speech_style": self.speech_style, "tags": self.tags}
 
 
 class NPC:
@@ -93,6 +95,11 @@ class NPC:
                              inventory=self._initial_inventory())
         world.add_entity(self.entity, announce=False)
         world.bus.subscribe(self._on_event, kinds=None)  # 全量感知
+
+        # 内状态与事件驱动更新器
+        self.inner_state = InnerState()
+        self.state_updater = StateUpdater(self)
+        world.bus.subscribe(self.state_updater.on_event, kinds=None)
 
     def _initial_inventory(self) -> List[str]:
         if self.persona.role == "blacksmith":
@@ -139,6 +146,7 @@ class NPC:
         return {
             **self.persona.to_dict(),
             "state": self.state_machine.state.value,
+            "inner_state": self.inner_state.to_dict(),
             "memory_size": {"short": len(self.memory.short),
                             "long": len(self.memory.long.records)},
         }

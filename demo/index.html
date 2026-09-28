@@ -29,6 +29,7 @@
   header h1 span { color: var(--primary); }
   .hud { display: flex; gap: 12px; font-size: 12px; color: var(--text-soft); margin-left: auto; }
   .hud b { color: var(--text); font-weight: 600; }
+  .hud .model { color: var(--primary); font-size: 11px; align-self: center; }
   .btn {
     border: 1px solid var(--border); background: #fff; border-radius: 8px;
     padding: 5px 14px; font-size: 12px; cursor: pointer; color: var(--text);
@@ -98,6 +99,7 @@
   <div class="hud">
     <div>时间 <b id="hud-clock">--:--</b></div>
     <div>天气 <b id="hud-weather">--</b></div>
+    <div class="model" id="hud-model"></div>
     <button class="btn" id="btn-tick">推进时间 +10min</button>
     <button class="btn" id="btn-auto">自动流逝</button>
   </div>
@@ -146,6 +148,8 @@ async function refresh() {
   state.world = s.world; state.npcs = s.npcs;
   $("hud-clock").textContent = s.world.clock;
   $("hud-weather").textContent = WEATHER_CN[s.world.weather] || s.world.weather;
+  const llm = s.llm || {};
+  $("hud-model").textContent = llm.provider === "mock" ? "离线 Mock" : (llm.model || llm.provider || "");
   renderCards(); renderMap();
   for (const e of s.recent_events) {
     const key = e.tick + ":" + e.kind + ":" + e.actor + ":" + (e.summary || "");

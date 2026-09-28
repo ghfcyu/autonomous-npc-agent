@@ -2,6 +2,9 @@
 
 启动：
     python -m api.server          # http://127.0.0.1:8000
+
+若项目根目录存在 .env（参考 .env.example），启动时自动加载，
+即可用真实大模型驱动 NPC；无 .env 时自动回退离线 Mock。
 """
 
 from __future__ import annotations
@@ -9,7 +12,24 @@ from __future__ import annotations
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+
+
+def _load_env(path: str) -> None:
+    """极简 .env 加载器：KEY=VALUE，# 注释，不覆盖已有环境变量。"""
+    if not os.path.exists(path):
+        return
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            os.environ.setdefault(key.strip(), value.strip())
+
+
+_load_env(os.path.join(ROOT, ".env"))
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
@@ -18,11 +38,14 @@ from pydantic import BaseModel
 from engine.engine import NPCEngine
 from engine.llm import create_provider
 
-DATA_DIR = os.environ.get("NPC_DATA_DIR", os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "memory_store"))
+DATA_DIR = os.environ.get("NPC_DATA_DIR", os.path.join(ROOT, "data", "memory_store"))
 
 app = FastAPI(title="autonomous-npc-agent", version="0.1.0")
-engine = NPCEngine(llm=create_provider(), store_dir=DATA_DIR)
+_provider = create_provider()
+print(f"[npc-engine] LLM provider: {_provider.name}"
+      + (f" ({_provider.base_url}, model={_provider.model})"
+         if getattr(_provider, "base_url", "") else ""))
+engine = NPCEngine(llm=_provider, store_dir=DATA_DIR)
 
 
 class TalkRequest(BaseModel):
@@ -40,14 +63,15 @@ class MoveRequest(BaseModel):
 
 @app.get("/")
 def index() -> FileResponse:
-    demo_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                             "demo", "index.html")
-    return FileResponse(demo_path)
+    return FileResponse(os.path.join(ROOT, "demo", "index.html"))
 
 
 @app.get("/api/status")
 def status():
-    return engine.status()
+    result = engine.status()
+    result["llm"] = {"provider": _provider.name,
+                     "model": getattr(_provider, "model", None)}
+    return result
 
 
 @app.post("/api/talk")

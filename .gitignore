@@ -32,3 +32,9 @@ data/memory_store/*.local.json
 
 # 迭代代理的临时工作区
 .temp/
+
+# 自主迭代管理文件（仅本地保存，不上传 GitHub）
+PROGRESS.md
+iteration-log/
+reviews/
+FINAL_REPORT.md

@@ -64,6 +64,9 @@ class NPCEngine:
         # 记忆巩固（溢出才触发）
         npc.memory.consolidate()
 
+        # G3: 玩家交互累积事件槽
+        self.world.accumulate_event_slot()
+
         return {
             "ok": True,
             "npc": npc.persona.name,

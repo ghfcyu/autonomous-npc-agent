@@ -3,10 +3,10 @@ AIGC:
   ContentProducer: '001191110102MAD55U9H0F10002'
   ContentPropagator: '001191110102MAD55U9H0F10002'
   Label: '1'
-  ProduceID: '1c3daeec-694e-4320-b0c6-d67cc05dfa64'
-  PropagateID: '1c3daeec-694e-4320-b0c6-d67cc05dfa64'
-  ReservedCode1: '64734dbb-1ec0-4b17-b48a-accb8c35be3d'
-  ReservedCode2: '64734dbb-1ec0-4b17-b48a-accb8c35be3d'
+  ProduceID: '04be73d8-5e6f-432d-a357-1169d49eb7b7'
+  PropagateID: '04be73d8-5e6f-432d-a357-1169d49eb7b7'
+  ReservedCode1: '437f0647-9db2-4e97-848c-e91c7a079a18'
+  ReservedCode2: '437f0647-9db2-4e97-848c-e91c7a079a18'
 ---
 
 # 架构设计
@@ -26,7 +26,9 @@ AIGC:
 - `EventBus`：发布/订阅 + 事件历史环形缓冲。事件不可变（`frozen dataclass`），便于回放与测试
 - `World.snapshot(npc)`：生成"某个 NPC 眼中"的局部世界视图，只喂给他位置可见的信息——这是后续做视野/ stealth 玩法的挂载点
 
-关键事件类型：`player_entered` / `player_spoke` / `item_given` / `npc_action` / `weather_changed` / `time_passed`
+关键事件类型：`player_entered` / `player_spoke` / `item_given` / `npc_action` / `weather_changed` / `time_passed` / `env_event`（G3 世界活性：事件槽满时自动触发）
+
+- **EventSlot**（G3）：世界随机事件槽，每次交互/时间推进累积 +5%，满 100% 触发一个环境事件并归零。事件体现"NPC 有自己生活"（如铁匠陈想起该去收矿石了），通过 `_publish_env_event()` 确定性选择（基于 trigger_count 取模）并发布 `env_event` 类型事件，同地点 NPC 感知并写入短期记忆
 
 ### 2. 记忆层（`engine/memory.py`）
 
@@ -121,6 +123,18 @@ InnerState（arousal/mood/energy/stress/trust，值域 [0,1]）
       → ActionValidator：白名单 + 一致性校验 ✓
   → ActionExecutor 执行 → 世界事件 npc_action → StateUpdater 更新内状态（energy-0.02）
   → 记忆层沉淀本次交互 → 短期记忆超限则触发巩固
+  → 事件槽累积 +5%（G3：player_says 末尾调用 accumulate_event_slot）
+```
+
+## 数据流（世界自发事件，G3）
+
+```
+EventSlot 累积满 100%（tick 或 player_says 推进）
+  → World._publish_env_event() 确定性选择环境事件
+  → EventBus 发布 env_event 事件（如 actor=chen, summary="铁匠陈想起该去收矿石了"）
+  → NPC._on_event 命中：actor==自身 或 同地点 → MemorySystem.observe
+      → importance 0.5 < 0.7 阈值 → 仅写短期记忆（环境事件不直写长期）
+  → NPC 短期记忆中新增环境事件记忆 → 下次对话时进入【最近的经历】上下文
 ```
 
 ## 数据流（一次送礼）
@@ -146,8 +160,8 @@ InnerState（arousal/mood/energy/stress/trust，值域 [0,1]）
 
 项目由一套定时驱动的自主迭代系统持续演进（GAN 式对抗 + PM 协作）：
 
-- **每日 20:00 迭代（PM 模式）**：主会话作为产品经理，通过 Task 工具派子代理协作——explore 型调研代码影响面，general 型实现功能/写测试（可并行）。PM 不亲自写实现代码，负责任务分解、自包含任务书撰写、验收（亲自跑测试、读 diff）、整合提交。红线：子代理产出必须 PM 亲自验证后才可入库；Task 不可用时降级为单兵模式。
-- **每三天 22:00 审查（判别器）**：以"默认不合格"立场审查，可派 explore 子代理并行收集证据，但评级与批判必须主审者亲自出。含主人指令核对、数据一致性核查、对抗升级机制。
+- **每日 22:00 迭代（PM 模式）**：主会话作为产品经理，通过 Task 工具派子代理协作——explore 型调研代码影响面，general 型实现功能/写测试（可并行）。PM 不亲自写实现代码，负责任务分解、自包含任务书撰写、验收（亲自跑测试、读 diff）、整合提交。红线：子代理产出必须 PM 亲自验证后才可入库；Task 不可用时降级为单兵模式。
+- **每三天 23:00 审查（判别器）**：以"默认不合格"立场审查，可派 explore 子代理并行收集证据，但评级与批判必须主审者亲自出。含主人指令核对、数据一致性核查、对抗升级机制。
 - **共享状态**：PROGRESS.md（北极星+目标状态机+主人指令）、iteration-log/（逐日日志）、reviews/（批判报告）构成跨会话共享内存；桌面 log/ 生成面向项目主人的监督简报。
 
 ## 已知边界（当前 MVP 的取舍）

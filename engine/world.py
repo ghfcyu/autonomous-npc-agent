@@ -83,10 +83,45 @@ class EventBus:
             handler(event)
 
 
+class EventSlot:
+    """世界随机事件槽：累积→触发→归零。"""
+
+    DEFAULT_STEP = 0.05
+    DEFAULT_THRESHOLD = 1.0
+
+    def __init__(self, step: float = DEFAULT_STEP, threshold: float = DEFAULT_THRESHOLD):
+        self.step = step
+        self.threshold = threshold
+        self.accumulation = 0.0
+        self.trigger_count = 0
+
+    def accumulate(self, amount: float = None) -> bool:
+        """累积事件槽。amount 为 None 时使用默认步长。返回是否触发。"""
+        self.accumulation += amount if amount is not None else self.step
+        if self.accumulation >= self.threshold:
+            self.accumulation = 0.0
+            self.trigger_count += 1
+            return True
+        return False
+
+    @property
+    def progress(self) -> float:
+        return max(0.0, min(self.accumulation / self.threshold, 1.0))
+
+
 class World:
     """游戏世界状态与感知入口。"""
 
-    def __init__(self, locations: Optional[List[Location]] = None) -> None:
+    _DEFAULT_ENV_EVENTS = [
+        {"actor": "chen", "summary": "铁匠陈想起该去收矿石了"},
+        {"actor": "lily", "summary": "莉莉盘算着新货的报价"},
+        {"actor": "chen", "summary": "铁匠陈觉得炉火该添炭了"},
+        {"actor": "lily", "summary": "莉莉在整理货架上的商品"},
+    ]
+
+    def __init__(self, locations: Optional[List[Location]] = None,
+                 env_events: Optional[List[Dict[str, Any]]] = None,
+                 event_slot: Optional[EventSlot] = None) -> None:
         self.tick_count = 0
         self.game_minute = 8 * 60  # 从早上 8:00 开始
         self.weather = Weather.SUNNY
@@ -95,6 +130,8 @@ class World:
             loc.id: loc for loc in (locations or self._default_locations())
         }
         self.entities: Dict[str, Entity] = {}
+        self.event_slot = event_slot or EventSlot()
+        self._env_events = env_events if env_events is not None else list(self._DEFAULT_ENV_EVENTS)
 
     # ------------------------------------------------------------------ #
     # 默认地图
@@ -130,6 +167,29 @@ class World:
                 self.weather = random.choice(candidates)
                 self.bus.publish(WorldEvent(self.tick_count, "weather_changed", "world",
                                             {"weather": self.weather.value}))
+
+        # G3: 事件槽累积，满则触发环境事件
+        if self.event_slot.accumulate():
+            self._publish_env_event()
+
+    # ------------------------------------------------------------------ #
+    # 随机事件槽（G3：世界活性）
+    # ------------------------------------------------------------------ #
+    def accumulate_event_slot(self, amount: float = None) -> bool:
+        """外部调用（如 player_says）累积事件槽，满则触发环境事件。"""
+        if self.event_slot.accumulate(amount):
+            self._publish_env_event()
+            return True
+        return False
+
+    def _publish_env_event(self):
+        """确定性选择并发布环境事件（基于 trigger_count 取模）。"""
+        idx = (self.event_slot.trigger_count - 1) % len(self._env_events)
+        event_def = self._env_events[idx]
+        self.bus.publish(WorldEvent(
+            self.tick_count, "env_event", event_def["actor"],
+            {"summary": event_def["summary"]},
+        ))
 
     # ------------------------------------------------------------------ #
     # 实体与物品

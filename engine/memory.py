@@ -135,6 +135,7 @@ class MemorySystem:
             "entity_moved": ("{actor} 离开了", 0.2),
             "weather_changed": ("天气变成了 {weather}", 0.2),
             "npc_action": ("自己做了：{summary}", 0.3),
+            "env_event": ("环境事件：{summary}", 0.5),
         }
         if event.kind not in templates:
             return

@@ -29,14 +29,19 @@ class MockLLMProvider(BaseLLMProvider):
         self.chaos_rate = chaos_rate
         self._rng = random.Random(seed)
         self._seen: Dict[str, int] = {}  # npc_id -> 交互次数
+        self.call_count: int = 0
+        self.call_log: List[str] = []  # 记录每次 chat 调用的 persona_id
 
     def chat(self, messages: List[Dict[str, str]], temperature: float = 0.7) -> str:
+        self.call_count += 1
         system = messages[0]["content"] if messages else ""
         user = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
 
         # 从 system 提示里解析人格标记（决策层写入的 <!--persona:xxx--> 注释）
         match = re.search(r"<!--persona:([\w-]+)-->", system)
         persona_id = match.group(1) if match else "unknown"
+        if match:
+            self.call_log.append(match.group(1))
         # 提取人格对话库（决策层以 JSON 附在 system 末尾）
         banks = self._extract_banks(system)
 

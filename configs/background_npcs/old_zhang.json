@@ -1,0 +1,16 @@
+{
+  "id": "old_zhang",
+  "name": "老张",
+  "role": "elder",
+  "location_id": "market",
+  "summary": "铁匠陈的父亲，退休的老铁匠",
+  "reactions": {
+    "env_event": [
+      "{npc_name}听见了{summary}",
+      "{npc_name}摇了摇头，自言自语了几句"
+    ],
+    "entity_moved": [
+      "{npc_name}打量着来人"
+    ]
+  }
+}

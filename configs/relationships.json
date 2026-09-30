@@ -1,0 +1,4 @@
+[
+  {"source_id": "chen", "target_id": "old_zhang", "target_name": "老张", "relation": "父亲", "affinity": 0.9},
+  {"source_id": "lily", "target_id": "guard_wang", "target_name": "王守卫", "relation": "熟人", "affinity": 0.3}
+]

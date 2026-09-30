@@ -12,6 +12,7 @@ from .inner_state import InnerState, StateUpdater
 from .decision import DecisionEngine
 from .llm.base import BaseLLMProvider
 from .memory import MemorySystem
+from .relationships import RelationshipNetwork
 from .states import NPCState, StateMachine
 from .world import World, WorldEvent
 
@@ -80,12 +81,13 @@ class NPC:
     """一个活着的 NPC：感知事件、维护记忆、做出决策。"""
 
     def __init__(self, persona: Persona, llm: BaseLLMProvider,
-                 world: World, store_dir: Optional[str] = None) -> None:
+                 world: World, store_dir: Optional[str] = None,
+                 relationships: Optional['RelationshipNetwork'] = None) -> None:
         self.persona = persona
         self.world = world
         self.memory = MemorySystem(persona.id, store_dir=store_dir)
         self.state_machine = StateMachine(NPCState.WORKING)
-        self.decision = DecisionEngine(persona, llm)
+        self.decision = DecisionEngine(persona, llm, relationships=relationships)
         self.executor = ActionExecutor(world)
 
         # 注册到世界

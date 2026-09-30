@@ -3,10 +3,10 @@ AIGC:
   ContentProducer: '001191110102MAD55U9H0F10002'
   ContentPropagator: '001191110102MAD55U9H0F10002'
   Label: '1'
-  ProduceID: '04be73d8-5e6f-432d-a357-1169d49eb7b7'
-  PropagateID: '04be73d8-5e6f-432d-a357-1169d49eb7b7'
-  ReservedCode1: '437f0647-9db2-4e97-848c-e91c7a079a18'
-  ReservedCode2: '437f0647-9db2-4e97-848c-e91c7a079a18'
+  ProduceID: '27ed8f56-21d5-4691-991c-4e1bafd48e87'
+  PropagateID: '27ed8f56-21d5-4691-991c-4e1bafd48e87'
+  ReservedCode1: 'ea7da04c-5768-4769-8b5e-18ea3884cdd7'
+  ReservedCode2: 'ea7da04c-5768-4769-8b5e-18ea3884cdd7'
 ---
 
 # 架构设计
@@ -71,6 +71,43 @@ InnerState（arousal/mood/energy/stress/trust，值域 [0,1]）
 - **标签系统**：Persona.tags（Dict[str, float]），如 {"较为自负": 0.7}。标签在 StateUpdater 中可推断地影响参数增量幅度，并在 system prompt 中注入供 LLM 柔性调整说话风格
 - **硬约束**：decide() 在 LLM 调用前检查 stress/energy 阈值——压力过高自动 REFUSE（不接单），精力过低自动 REFUSE（提前收摊），与 SLEEPING 硬规则同级
 
+### 2.7 关系网络层（`engine/relationships.py`）
+
+```
+RelationshipNetwork（存储 List[Relationship]）
+    │  query(source_id) / query_by_relation / get_relation_to
+    │  to_prompt_text(source_id)
+    ▼
+注入 DecisionEngine._system_prompt() 的【人际关系】块
+    │
+    ▼
+核心 NPC 决策时感知社会关系（如"你的父亲是老张（好感 0.9）"）
+```
+
+- **Relationship**：有向社会关系（source → target），含关系类型（父亲/熟人/宿敌）与好感值（-1.0~1.0）
+- **RelationshipNetwork**：存储与查询关系，`to_prompt_text()` 生成注入 LLM 决策上下文的关系描述（好感 >0.3 显示"好感"，< -0.3 显示"敌意"），无关系时返回空串不注入
+- **配置驱动**：`configs/relationships.json`（JSON 数组），NPCEngine 初始化时自动加载
+
+### 2.8 背景 NPC 层（`engine/background_npc.py`）
+
+```
+WorldEvent（事件总线发布）
+    │  BackgroundNPC._on_event()（catch-all 订阅者）
+    ▼
+规则反应引擎：事件类型过滤 + 位置过滤 + 确定性模板轮转
+    │
+    ▼
+发布 npc_action 事件回流总线（actor 为背景 NPC id）
+    │
+    ▼
+同地点核心 NPC 感知 → 写入短期记忆
+```
+
+- **BackgroundNPC**：轻量级 NPC，不持有 LLM 引用（架构上不可能调用 LLM），不维护记忆/内状态/状态机
+- **配置驱动**：`configs/background_npcs/*.json`（id/name/role/location_id/summary/reactions），NPCEngine 全默认构造时自动加载
+- **规则反应**：对配置了模板的事件类型产生确定性反应——`env_event` 只反应同地点、`entity_moved` 只反应有人来到自己地点，模板按计数器取模轮转，`{npc_name}` 替换为 NPC 名
+- **零 LLM 断言**：MockLLMProvider 记录 `call_count`/`call_log`，测试可断言背景 NPC 的 id 从未出现在调用日志中
+
 ### 3. 决策层（`engine/decision.py`）
 
 **混合决策**是本项目最重要的设计决策：
@@ -85,7 +122,7 @@ InnerState（arousal/mood/energy/stress/trust，值域 [0,1]）
 
 1. 硬规则前置：当前状态是否允许对话？（SLEEPING → 直接产出"睡梦中嘟囔"的回退动作）
 2. 内状态硬约束：压力 > 0.8 → 拒绝接单；精力 < 0.15 → 提前收摊
-3. 上下文组装：人格卡 + 性格标签 + 相关长期记忆 + 短期记忆 + 世界快照 + **此刻内心状态** + 玩家输入 + 输出 JSON 契约
+3. 上下文组装：人格卡 + 性格标签 + **人际关系** + 相关长期记忆 + 短期记忆 + 世界快照 + **此刻内心状态** + 玩家输入 + 输出 JSON 契约
 4. LLM 生成结构化动作
 5. 校验失败/解析异常 → 人格自带的 `fallback_bank` 安全回退
 
@@ -147,6 +184,18 @@ EventSlot 累积满 100%（tick 或 player_says 推进）
       → importance 0.8 ≥ 阈值 0.7 → 短期记忆 + 长期记忆双写（tags 含 item_given/玩家）
   → 下次对话时 context_for("铁矿石") 命中该长期记忆 → 进入决策上下文
      → "上次你给我的那块铁矿石，打成好钢了"这类回应有了记忆地基
+```
+
+## 数据流（背景 NPC 规则反应，G4）
+
+```
+环境事件 env_event 发布（如 actor=lily, summary="莉莉盘算新货报价"）
+  → BackgroundNPC._on_event 命中：reactions 配置了 env_event 模板
+  → 位置过滤：actor lily 在 market，背景 NPC old_zhang 也在 market → 同地点 ✓
+  → 确定性选择模板（计数器取模轮转）→ 格式化（{npc_name}→老张, {summary}→莉莉盘算...）
+  → 发布 npc_action 事件（actor=old_zhang, summary="老张听见了莉莉盘算新货报价"）
+  → 同地点核心 NPC lily 感知该 npc_action → 写入短期记忆
+  → 全程零 LLM 调用（BackgroundNPC 不持有 LLM 引用）
 ```
 
 ## 工程约定

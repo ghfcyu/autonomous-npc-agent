@@ -8,14 +8,22 @@
 
 from __future__ import annotations
 
+import json
 import os
 from typing import Any, Dict, List, Optional
 
 from .actions import Action
+from .background_npc import BackgroundNPC
 from .llm import create_provider
 from .llm.base import BaseLLMProvider
 from .npc import NPC, Persona
+from .relationships import RelationshipNetwork
 from .world import Entity, World, WorldEvent
+
+DEFAULT_BG_CONFIG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                      "configs", "background_npcs")
+DEFAULT_RELATIONSHIPS_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                           "configs", "relationships.json")
 
 
 class NPCEngine:
@@ -23,11 +31,21 @@ class NPCEngine:
 
     def __init__(self, llm: Optional[BaseLLMProvider] = None,
                  npc_configs: Optional[List[Persona]] = None,
-                 store_dir: Optional[str] = None) -> None:
+                 store_dir: Optional[str] = None,
+                 background_configs: Optional[List[dict]] = None,
+                 relationships: Optional[RelationshipNetwork] = None) -> None:
         self.world = World()
         self.llm = llm or create_provider()
         self.store_dir = store_dir
         self.npcs: Dict[str, NPC] = {}
+
+        # 关系网：显式传入 > 默认文件 > 空网络
+        if relationships is not None:
+            self.relationships = relationships
+        elif os.path.exists(DEFAULT_RELATIONSHIPS_PATH):
+            self.relationships = RelationshipNetwork.from_file(DEFAULT_RELATIONSHIPS_PATH)
+        else:
+            self.relationships = RelationshipNetwork()
 
         # 玩家实体
         self.world.add_entity(Entity(id="player", kind="player", name="旅行者",
@@ -36,9 +54,34 @@ class NPCEngine:
         for persona in (npc_configs if npc_configs is not None else Persona.load_all()):
             self.spawn(persona)
 
+        # 生成背景 NPC：显式传入配置时完全按传入值；全默认构造（生产/演示路径）
+        # 时自动加载 configs/background_npcs/；显式传入自定义 npc_configs（测试/
+        # 嵌入场景）时不隐式注入，保证场景可控。
+        self.background_npcs: Dict[str, BackgroundNPC] = {}
+        if background_configs is not None:
+            bg_configs = background_configs
+        elif npc_configs is None:
+            bg_configs = self._load_bg_configs()
+        else:
+            bg_configs = []
+        for config in bg_configs:
+            bg = BackgroundNPC(config, self.world)
+            self.background_npcs[bg.id] = bg
+
+    @staticmethod
+    def _load_bg_configs(config_dir: str = DEFAULT_BG_CONFIG_DIR) -> List[dict]:
+        configs = []
+        if os.path.isdir(config_dir):
+            for fname in sorted(os.listdir(config_dir)):
+                if fname.endswith(".json"):
+                    with open(os.path.join(config_dir, fname), encoding="utf-8") as fh:
+                        configs.append(json.load(fh))
+        return configs
+
     # ------------------------------------------------------------------ #
     def spawn(self, persona: Persona) -> NPC:
-        npc = NPC(persona, self.llm, self.world, store_dir=self.store_dir)
+        npc = NPC(persona, self.llm, self.world, store_dir=self.store_dir,
+                  relationships=self.relationships)
         self.npcs[persona.id] = npc
         return npc
 
@@ -129,7 +172,8 @@ class NPCEngine:
                 "player": {"location": self.world.entities["player"].location_id,
                            "inventory": self.world.entities["player"].inventory},
             },
-            "npcs": [npc.to_dict() for npc in self.npcs.values()],
+            "npcs": [npc.to_dict() for npc in self.npcs.values()] +
+                    [bg.to_dict() for bg in self.background_npcs.values()],
             "recent_events": [
                 {"tick": e.tick, "kind": e.kind, "actor": e.actor,
                  "summary": e.payload.get("summary") or e.payload.get("text") or e.kind}

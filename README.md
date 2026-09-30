@@ -3,10 +3,10 @@ AIGC:
   ContentProducer: '001191110102MAD55U9H0F10002'
   ContentPropagator: '001191110102MAD55U9H0F10002'
   Label: '1'
-  ProduceID: '7d4dd33c-a4c0-4357-957b-920a8481a99f'
-  PropagateID: '7d4dd33c-a4c0-4357-957b-920a8481a99f'
-  ReservedCode1: '17504883-9dd7-459a-a643-051383770f7d'
-  ReservedCode2: '17504883-9dd7-459a-a643-051383770f7d'
+  ProduceID: '06c2d3d0-04ec-4471-a950-d34f57098108'
+  PropagateID: '06c2d3d0-04ec-4471-a950-d34f57098108'
+  ReservedCode1: '4ccad5a8-2f93-40cc-b9ee-10dabda85d76'
+  ReservedCode2: '4ccad5a8-2f93-40cc-b9ee-10dabda85d76'
 ---
 
 # autonomous-npc-agent
@@ -27,6 +27,8 @@ AIGC:
 - **可推断标签系统**：人格配置支持心理学标签（如"较为自负 0.7""守财 0.8"），标签可推断地影响言行——被夸时兴奋度涨幅高于常人、收到礼物时信任涨幅更大
 - **内状态硬约束**：压力过高自动拒绝接单、精力过低提前收摊，NPC 的内心状态直接决定行为边界，而非仅靠 LLM 自由发挥
 - **世界活性（随机事件槽）**：世界维护事件槽，每次交互/时间推进累积 +5%，满 100% 自发触发环境事件（"铁匠陈想起该去收矿石了""莉莉盘算新货报价"），同地点 NPC 感知并写入记忆——世界不因玩家离线而静止
+- **分层 NPC（轻量背景 NPC）**：核心 NPC 跑完整决策链（人格+记忆+LLM），背景 NPC 只用"身份+一句概括+关系"纯规则反应——零 LLM 调用、零记忆开销，让村庄有人气但不烧 token
+- **关系网络**：NPC 之间结构化存储社会关系（父子/熟人/宿敌，好感/敌意值），关系数据注入核心 NPC 决策上下文——提到其父时语气变化、提及熟人时态度不同
 - **可靠性护栏**：动作白名单 + 状态机校验 + 内状态硬约束，LLM 输出经过验证器过滤，异常时安全回退
 - **零依赖内核**：engine 核心仅使用 Python 标准库；FastAPI 服务为可选层
 - **可视化 Demo**：自带 2D 俯视小地图 + 聊天界面的 Web 演示端
@@ -92,13 +94,17 @@ autonomous-npc-agent/
 │   ├── decision.py        # 决策层：状态机约束 + LLM 混合决策
 │   ├── actions.py         # 行动层：动作定义、白名单校验、执行器
 │   ├── inner_state.py     # 内状态层：量化心理参数 + 事件驱动规则引擎
+│   ├── relationships.py   # 关系网络：NPC 社会关系存储与查询
+│   ├── background_npc.py  # 背景 NPC：轻量级零 LLM 规则反应
 │   ├── npc.py             # NPC 装配：人格配置、感知订阅、内状态
 │   ├── engine.py          # 引擎入口：世界与 NPC 的编排
 │   └── llm/               # 可插拔 LLM Provider
 │       ├── base.py        #   抽象接口
 │       ├── openai_compat.py  # OpenAI 协议实现
 │       └── mock.py        # 离线 Mock（开发/测试用）
-├── configs/npcs/          # NPC 人格配置（JSON，热加载）
+├── configs/npcs/          # 核心 NPC 人格配置（JSON，热加载）
+├── configs/background_npcs/  # 背景 NPC 配置（JSON）
+├── configs/relationships.json  # NPC 关系网络配置
 ├── api/server.py          # FastAPI 服务（可选）
 ├── demo/index.html        # 2D 可视化演示端
 ├── scripts/run_demo.py    # CLI REPL 演示
@@ -141,7 +147,7 @@ autonomous-npc-agent/
 python3 -m unittest discover -s tests -v
 ```
 
-覆盖：记忆读写与巩固、事件驱动长期写入、玩家送礼闭环、事件总线、状态机迁移约束、动作白名单校验、LLM 异常输出回退、引擎端到端闭环、量化内状态参数变化、标签行为影响、内状态硬约束（压力/精力阈值拒绝）、能量随时间消耗与恢复、随机事件槽累积与触发、环境事件 NPC 感知与确定性测试。
+覆盖：记忆读写与巩固、事件驱动长期写入、玩家送礼闭环、事件总线、状态机迁移约束、动作白名单校验、LLM 异常输出回退、引擎端到端闭环、量化内状态参数变化、标签行为影响、内状态硬约束（压力/精力阈值拒绝）、能量随时间消耗与恢复、随机事件槽累积与触发、环境事件 NPC 感知与确定性测试、背景 NPC 规则反应与零 LLM 调用断言、关系网络 CRUD 与决策上下文注入。
 
 ## 路线图
 
@@ -151,7 +157,8 @@ python3 -m unittest discover -s tests -v
 - [x] **世界活性** 随机事件槽 + 环境事件自发触发 + NPC 感知写入记忆（2026-09-29）
 - [ ] **L2+** 对玩家的长期记忆强化（"你上周帮过我"）、语义化检索、记忆巩固升级（LLM 摘要）
 - [ ] **L3** 目标驱动的自主行为（日程、需求、主动性）
-- [ ] **L4** 多智能体社会（NPC 互聊、关系网、信息传播）
+- [x] **L4 前置** 轻量背景 NPC（零 LLM 规则反应）+ 关系网络（结构化存储+注入决策上下文）（2026-09-30）
+- [ ] **L4** 多智能体社会（NPC 互聊、关系网深化、信息传播）
 - [ ] 行为评测集（给定场景断言行为合理性，自动化回归）
 
 ## License

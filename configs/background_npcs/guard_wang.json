@@ -1,0 +1,17 @@
+{
+  "id": "guard_wang",
+  "name": "王守卫",
+  "role": "guard",
+  "location_id": "plaza",
+  "summary": "村口的老守卫，日复一日守着村子",
+  "reactions": {
+    "env_event": [
+      "{npc_name}听见了{summary}",
+      "{npc_name}抬头望了望，没太在意"
+    ],
+    "entity_moved": [
+      "{npc_name}注意到有人来了",
+      "{npc_name}瞥了一眼来人"
+    ]
+  }
+}

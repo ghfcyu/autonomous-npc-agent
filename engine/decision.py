@@ -18,6 +18,7 @@ from typing import Any, Dict, Optional
 
 from .actions import Action, ActionType, ActionValidator
 from .llm.base import BaseLLMProvider, LLMError
+from .relationships import RelationshipNetwork
 from .world import World
 
 OUTPUT_CONTRACT = """你只能输出一个 JSON 对象（不要输出任何其他文字），格式：
@@ -35,9 +36,11 @@ _JSON_RE = re.compile(r"\{.*\}", re.DOTALL)
 class DecisionEngine:
     """单个 NPC 的决策引擎。"""
 
-    def __init__(self, persona, llm: BaseLLMProvider) -> None:
+    def __init__(self, persona, llm: BaseLLMProvider,
+                 relationships: Optional[RelationshipNetwork] = None) -> None:
         self.persona = persona
         self.llm = llm
+        self.relationships = relationships
 
     # ------------------------------------------------------------------ #
     # 提示词组装
@@ -52,6 +55,11 @@ class DecisionEngine:
         tag_line = ""
         if p.tags:
             tag_line = f"\n性格标签：{'、'.join(f'{k}({v})' for k, v in p.tags.items())}"
+        rel_line = ""
+        if self.relationships:
+            rel_text = self.relationships.to_prompt_text(self.persona.id)
+            if rel_text:
+                rel_line = f"\n{rel_text}\n"
         return (
             f"<!--persona:{p.id}-->\n"
             f"你是游戏里的 NPC「{p.name}」，职业：{p.role}。\n"
@@ -59,7 +67,7 @@ class DecisionEngine:
             f"说话风格：{p.speech_style}\n"
             f"背景：{p.backstory}\n"
             f"喜欢：{'、'.join(p.likes)}；讨厌：{'、'.join(p.dislikes)}\n"
-            f"{tag_line}\n\n"
+            f"{tag_line}{rel_line}\n\n"
             f"{OUTPUT_CONTRACT}\n"
             f"<<<banks>>>{json.dumps(banks, ensure_ascii=False)}"
         )

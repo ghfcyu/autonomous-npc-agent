@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 import random
 import re
-from typing import Dict, List
+from typing import Dict, List, Any
 
 from .base import BaseLLMProvider
 
@@ -56,7 +56,7 @@ class MockLLMProvider(BaseLLMProvider):
         return json.dumps({"action": "speak", "text": text}, ensure_ascii=False)
 
     # ------------------------------------------------------------------ #
-    def _extract_banks(self, system: str) -> Dict[str, List[str]]:
+    def _extract_banks(self, system: str) -> Dict[str, Any]:
         marker = "<<<banks>>>"
         if marker not in system:
             return {}
@@ -66,7 +66,7 @@ class MockLLMProvider(BaseLLMProvider):
         except json.JSONDecodeError:
             return {}
 
-    def _match_topics(self, user: str, banks: Dict[str, List[str]]) -> str:
+    def _match_topics(self, user: str, banks: Dict[str, Any]) -> str:
         for pattern, responses in (banks.get("topic_responses") or {}).items():
             regex = _TOPIC_RE_CACHE.setdefault(pattern, re.compile(pattern))
             if regex.search(user):

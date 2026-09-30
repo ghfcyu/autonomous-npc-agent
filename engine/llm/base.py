@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 
 class LLMError(RuntimeError):
@@ -18,6 +18,12 @@ class BaseLLMProvider(ABC):
     """所有 Provider 的基类。"""
 
     name: str = "base"
+    base_url: Optional[str] = None
+    model: Optional[str] = None
+
+    @property
+    def available(self) -> bool:
+        return True
 
     @abstractmethod
     def chat(self, messages: List[Dict[str, str]], temperature: float = 0.7) -> str:

@@ -95,7 +95,7 @@ class EventSlot:
         self.accumulation = 0.0
         self.trigger_count = 0
 
-    def accumulate(self, amount: float = None) -> bool:
+    def accumulate(self, amount: Optional[float] = None) -> bool:
         """累积事件槽。amount 为 None 时使用默认步长。返回是否触发。"""
         self.accumulation += amount if amount is not None else self.step
         if self.accumulation >= self.threshold:
@@ -175,7 +175,7 @@ class World:
     # ------------------------------------------------------------------ #
     # 随机事件槽（G3：世界活性）
     # ------------------------------------------------------------------ #
-    def accumulate_event_slot(self, amount: float = None) -> bool:
+    def accumulate_event_slot(self, amount: Optional[float] = None) -> bool:
         """外部调用（如 player_says）累积事件槽，满则触发环境事件。"""
         if self.event_slot.accumulate(amount):
             self._publish_env_event()

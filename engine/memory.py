@@ -156,7 +156,7 @@ class MemorySystem:
     # ------------------------------------------------------------------ #
     def consolidate(self) -> Optional[MemoryRecord]:
         """短期记忆接近满时，把最旧一批压缩成一条长期摘要。"""
-        if len(self.short) < self.short._deque.maxlen:
+        if self.short._deque.maxlen is None or len(self.short) < self.short._deque.maxlen:
             return None
         batch = self.short.pop_oldest(CONSOLIDATE_BATCH)
         if not batch:

@@ -3,10 +3,10 @@ AIGC:
   ContentProducer: '001191110102MAD55U9H0F10002'
   ContentPropagator: '001191110102MAD55U9H0F10002'
   Label: '1'
-  ProduceID: '06c2d3d0-04ec-4471-a950-d34f57098108'
-  PropagateID: '06c2d3d0-04ec-4471-a950-d34f57098108'
-  ReservedCode1: '4ccad5a8-2f93-40cc-b9ee-10dabda85d76'
-  ReservedCode2: '4ccad5a8-2f93-40cc-b9ee-10dabda85d76'
+  ProduceID: '20791bc5-03aa-4565-9398-cf17a99a56b5'
+  PropagateID: '20791bc5-03aa-4565-9398-cf17a99a56b5'
+  ReservedCode1: '869de5de-8c60-4078-8e15-2acd3c1f681e'
+  ReservedCode2: '869de5de-8c60-4078-8e15-2acd3c1f681e'
 ---
 
 # autonomous-npc-agent
@@ -115,31 +115,13 @@ autonomous-npc-agent/
 
 ## 架构一图流
 
-```
-                    ┌────────────────────────────────┐
-    玩家/游戏事件 ──▶ │  感知/世界层 World + EventBus   │
-                    └───┬──────────────┬─────────────┘
-                        │ events        │ events
-                        ▼               ▼
-              ┌─────────────┐   ┌──────────────┐
-              │ 记忆层       │   │ 内状态层      │
-              │ MemorySystem │   │ InnerState    │
-              │ 短期+长期    │   │ 规则引擎更新  │
-              └──────┬──────┘   └──────┬───────┘
-                     │ context_for()     │ to_prompt_text()
-                     ▼                   ▼
-              ┌─────────────────────────────┐
-              │  决策层 DecisionEngine        │
-              │  状态机+内状态(硬规则)+LLM   │
-              └───────┬─────────────────────┘
-                      │ Action(JSON, 白名单校验)
-                      ▼
-              ┌─────────────────────────────┐
-              │  行动层 ActionExecutor        │──▶ 世界状态变更/新事件
-              └─────────────────────────────┘
-```
+![架构图](docs/architecture.png)
 
-详见 [ARCHITECTURE.md](./ARCHITECTURE.md)。
+- 事件经 EventBus 分发，**记忆层**（短期/长期/事件驱动直写）与**内状态层**（5 维参数 + 规则引擎 + 标签）并行消费
+- 决策层混合决策：状态机与内状态管**硬规则**，LLM 管**柔性表达**；轻量 NPC 走纯规则路径（零 LLM 调用）
+- 行动层白名单校验后执行，新事件回流总线，形成**世界闭环**
+
+图表源文件 [docs/architecture.drawio](./docs/architecture.drawio) 可在 [app.diagrams.net](https://app.diagrams.net) 打开编辑。详见 [ARCHITECTURE.md](./ARCHITECTURE.md)。
 
 ## 测试
 

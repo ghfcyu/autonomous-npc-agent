@@ -26,9 +26,10 @@ AIGC:
 - `EventBus`：发布/订阅 + 事件历史环形缓冲。事件不可变（`frozen dataclass`），便于回放与测试
 - `World.snapshot(npc)`：生成"某个 NPC 眼中"的局部世界视图，只喂给他位置可见的信息——这是后续做视野/ stealth 玩法的挂载点
 
-关键事件类型：`player_entered` / `player_spoke` / `item_given` / `npc_action` / `weather_changed` / `time_passed` / `env_event`（G3 世界活性：事件槽满时自动触发）
+关键事件类型：`player_entered` / `player_spoke` / `item_given` / `npc_action` / `weather_changed` / `time_passed` / `env_event`（G3 世界活性：事件槽满时自动触发）/ `appearance_change`（G5 外观变化）
 
 - **EventSlot**（G3）：世界随机事件槽，每次交互/时间推进累积 +5%，满 100% 触发一个环境事件并归零。事件体现"NPC 有自己生活"（如铁匠陈想起该去收矿石了），通过 `_publish_env_event()` 确定性选择（基于 trigger_count 取模）并发布 `env_event` 类型事件，同地点 NPC 感知并写入短期记忆
+- **Entity.appearance**（G5）：实体可变外观（`outfit` 穿着 / `posture` 姿势 / `expression` 神情），`World.set_appearance()` 按键合并更新并发布 `appearance_change` 事件；快照 `nearby` 携带各实体外观副本。设计语义是"眼睛不是记忆"：同地点可见、异地不可见（既有感知过滤天然实现），importance 0.3 不直写长期记忆
 
 ### 2. 记忆层（`engine/memory.py`）
 
@@ -122,7 +123,7 @@ WorldEvent（事件总线发布）
 
 1. 硬规则前置：当前状态是否允许对话？（SLEEPING → 直接产出"睡梦中嘟囔"的回退动作）
 2. 内状态硬约束：压力 > 0.8 → 拒绝接单；精力 < 0.15 → 提前收摊
-3. 上下文组装：人格卡 + 性格标签 + **人际关系** + 相关长期记忆 + 短期记忆 + 世界快照 + **此刻内心状态** + 玩家输入 + 输出 JSON 契约
+3. 上下文组装：人格卡 + 性格标签 + **人际关系** + 相关长期记忆 + 短期记忆 + 世界快照（含**【周围的人】**同地点实体及外观，G5）+ **此刻内心状态** + 玩家输入 + 输出 JSON 契约
 4. LLM 生成结构化动作
 5. 校验失败/解析异常 → 人格自带的 `fallback_bank` 安全回退
 
@@ -140,9 +141,9 @@ WorldEvent（事件总线发布）
 
 ### 6. 编排层（`engine/engine.py` + `engine/npc.py`）
 
-- `Persona`：JSON 配置 → 人格对象（性格、背景、语气、对话库、作息表、**标签**）
+- `Persona`：JSON 配置 → 人格对象（性格、背景、语气、对话库、作息表、**标签**、**外观**）
 - `NPC`：人格 + 记忆系统 + 状态机 + 决策引擎 + **内状态** 的聚合根，订阅事件总线（记忆写入 + 状态更新双订阅）
-- `NPCEngine`：世界 + NPC 集合的编排入口，暴露 `player_says / player_gives / tick / status` 四个核心 API（`player_gives`：玩家送礼，库存转移或宽松发布事件，NPC 经事件链路记入短期+长期记忆）
+- `NPCEngine`：世界 + NPC 集合的编排入口，暴露 `player_says / player_gives / player_changes_appearance / tick / status` 五个核心 API（`player_gives`：玩家送礼，库存转移或宽松发布事件，NPC 经事件链路记入短期+长期记忆；`player_changes_appearance`：玩家换装，同地点 NPC 感知）
 
 ## 数据流（一次对话）
 
@@ -196,6 +197,18 @@ EventSlot 累积满 100%（tick 或 player_says 推进）
   → 发布 npc_action 事件（actor=old_zhang, summary="老张听见了莉莉盘算新货报价"）
   → 同地点核心 NPC lily 感知该 npc_action → 写入短期记忆
   → 全程零 LLM 调用（BackgroundNPC 不持有 LLM 引用）
+```
+
+## 数据流（外观变化与对话引用，G5）
+
+```
+玩家换上围裙（NPCEngine.player_changes_appearance({"outfit": "皮围裙"})）
+  → World.set_appearance 按键合并 Entity.appearance + 发布 appearance_change 事件
+  → NPC._on_event 位置过滤：同地点 NPC observe → "看到 player穿着变为皮围裙" 入短期记忆
+      （importance 0.3 < 0.7 不直写长期；异地 NPC 无感知；NPC 自身换装必可闻）
+  → 下次对话：World.snapshot 的 nearby 携带玩家外观
+      → DecisionEngine._user_prompt 注入【周围的人】"旅行者（穿着皮围裙）"
+      → LLM 收到外观描述 → 对话可引用对方穿着（nearby 为空则整块不注入，控 token）
 ```
 
 ## 工程约定

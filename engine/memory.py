@@ -136,6 +136,8 @@ class MemorySystem:
             "weather_changed": ("天气变成了 {weather}", 0.2),
             "npc_action": ("自己做了：{summary}", 0.3),
             "env_event": ("环境事件：{summary}", 0.5),
+            # 外观变化：importance 0.3 < 0.7，「眼睛不是记忆」——不直写长期记忆
+            "appearance_change": ("看到 {actor}{summary}", 0.3),
         }
         if event.kind not in templates:
             return
@@ -170,7 +172,8 @@ class MemorySystem:
                 speaks += 1
             for tag in rec.tags:
                 if tag not in ("player_spoke", "item_given", "player_entered",
-                               "entity_moved", "weather_changed", "npc_action"):
+                               "entity_moved", "weather_changed", "npc_action",
+                               "appearance_change"):
                     actors[tag] = actors.get(tag, 0) + 1
         parts = []
         if speaks:

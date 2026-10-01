@@ -39,6 +39,7 @@ class Persona:
     schedule: Dict[str, str] = field(default_factory=dict)
     topic_responses: Dict[str, List[str]] = field(default_factory=dict)
     tags: Dict[str, float] = field(default_factory=dict)
+    appearance: Dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def from_file(cls, path: str) -> "Persona":
@@ -94,7 +95,8 @@ class NPC:
         from .world import Entity
         self.entity = Entity(id=persona.id, kind="npc", name=persona.name,
                              location_id=persona.location_id,
-                             inventory=self._initial_inventory())
+                             inventory=self._initial_inventory(),
+                             appearance=dict(persona.appearance))
         world.add_entity(self.entity, announce=False)
         world.bus.subscribe(self._on_event, kinds=None)  # 全量感知
 

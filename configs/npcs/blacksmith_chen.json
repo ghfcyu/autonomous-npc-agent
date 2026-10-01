@@ -26,6 +26,7 @@
     "20": "SLEEPING"
   },
   "tags": {"较为自负": 0.7},
+  "appearance": {"outfit": "打铁皮围裙", "posture": "站着抡锤"},
   "topic_responses": {
     "父亲|爹|老张": [
       "我爹老张？他身子还硬朗，谢谢你问起。",

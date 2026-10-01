@@ -28,6 +28,9 @@ WEATHERS = [Weather.SUNNY, Weather.SUNNY, Weather.CLOUDY, Weather.RAIN]
 MINUTES_PER_TICK = 10
 WEATHER_CHANGE_PROB = 0.08
 
+# 外观键的中文显示名（world 发布事件 / decision 渲染提示词共用）
+APPEARANCE_KEY_CN = {"outfit": "穿着", "posture": "姿势", "expression": "神情"}
+
 
 @dataclass(frozen=True)
 class WorldEvent:
@@ -55,6 +58,7 @@ class Entity:
     name: str
     location_id: str
     inventory: List[str] = field(default_factory=list)
+    appearance: Dict[str, str] = field(default_factory=dict)  # 如 {"outfit": "皮围裙"}
 
 
 EventHandler = Callable[[WorldEvent], None]
@@ -210,6 +214,24 @@ class World:
                                     {"from": old, "to": location_id}))
         return True
 
+    def set_appearance(self, entity_id: str, changes: Dict[str, str]) -> bool:
+        """更新实体外观并发布 appearance_change 事件。实体不存在返回 False。
+
+        「眼睛不是记忆」：外观对同地点实体可见（由 NPC 感知过滤天然实现），
+        变化事件 importance=0.3 < 0.7，不直写长期记忆。
+        """
+        entity = self.entities.get(entity_id)
+        if entity is None:
+            return False
+        entity.appearance.update(changes)  # 按键合并，支持部分更新
+        summary = "、".join(
+            f"{APPEARANCE_KEY_CN.get(k, k)}变为{v}" for k, v in changes.items())
+        self.bus.publish(WorldEvent(
+            self.tick_count, "appearance_change", entity_id,
+            {"summary": summary, "changes": dict(changes),
+             "location": entity.location_id}))
+        return True
+
     def transfer_item(self, from_id: str, to_id: str, item: str) -> bool:
         src = self.entities.get(from_id)
         dst = self.entities.get(to_id)
@@ -237,7 +259,8 @@ class World:
             "weather": self.weather.value,
             "my_location": self.locations[viewer.location_id].name if viewer else None,
             "nearby": [
-                {"id": e.id, "kind": e.kind, "name": e.name, "inventory": list(e.inventory)}
+                {"id": e.id, "kind": e.kind, "name": e.name,
+                 "inventory": list(e.inventory), "appearance": dict(e.appearance)}
                 for e in visible if e.id != viewer_id
             ],
         }

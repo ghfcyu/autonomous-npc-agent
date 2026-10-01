@@ -146,6 +146,11 @@ class NPCEngine:
                 "from_inventory": from_inventory}
 
     # ------------------------------------------------------------------ #
+    def player_changes_appearance(self, changes: Dict[str, str]) -> bool:
+        """玩家更换外观（穿着/姿势），同地点 NPC 将感知到。"""
+        return self.world.set_appearance("player", changes)
+
+    # ------------------------------------------------------------------ #
     def tick(self, minutes: int = 10) -> Dict[str, Any]:
         self.world.tick(minutes)
         applied = {}

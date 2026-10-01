@@ -19,7 +19,7 @@ from typing import Any, Dict, Optional
 from .actions import Action, ActionType, ActionValidator
 from .llm.base import BaseLLMProvider, LLMError
 from .relationships import RelationshipNetwork
-from .world import World
+from .world import APPEARANCE_KEY_CN, World
 
 OUTPUT_CONTRACT = """你只能输出一个 JSON 对象（不要输出任何其他文字），格式：
 {"action": "speak", "text": "你说的话"}
@@ -80,11 +80,24 @@ class DecisionEngine:
         state_line = ""
         if inner_state is not None:
             state_line = f"【此刻内心】{inner_state.to_prompt_text()}\n"
+        # 周围的人：同地点可见的实体及其外观（空 nearby 不注入，控 token）
+        nearby_line = ""
+        if snapshot.get("nearby"):
+            rows = []
+            for e in snapshot["nearby"]:
+                if e.get("appearance"):
+                    look = "、".join(f"{APPEARANCE_KEY_CN.get(k, k)}{v}"
+                                     for k, v in e["appearance"].items())
+                    rows.append(f"{e['name']}（{look}）")
+                else:
+                    rows.append(e["name"])
+            nearby_line = "【周围的人】\n" + "\n".join(rows) + "\n"
         return (
             f"【相关长期记忆】\n{long_term}\n\n"
             f"【最近的经历】\n{recent}\n\n"
             f"【当前世界】时间 {snapshot.get('clock')}，天气 {snapshot.get('weather')}，"
             f"你在 {snapshot.get('my_location')}\n"
+            f"{nearby_line}"
             f"{state_line}"
             f"【玩家说】{player_input}"
         )

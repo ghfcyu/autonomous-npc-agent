@@ -1,0 +1,19 @@
+{
+  "id": "farmer_zhao",
+  "name": "赵老汉",
+  "role": "farmer",
+  "location_id": "plaza",
+  "summary": "在村边种了一辈子地，爱在广场歇脚",
+  "reactions": {
+    "env_event": [
+      "{npc_name}在广场石阶上晒着太阳，{summary}",
+      "{npc_name}磕了磕烟袋接着听"
+    ],
+    "entity_moved": [
+      "{npc_name}眯眼看看是谁来了"
+    ]
+  },
+  "inventory": ["谷物", "锄头"],
+  "residence": "house_zhao",
+  "schedule": {"5": "WORKING", "12": "IDLE", "19": "SLEEPING"}
+}

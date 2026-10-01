@@ -3,6 +3,7 @@
   "name": "铁匠陈",
   "role": "blacksmith",
   "location_id": "forge",
+  "residence": "house_chen",
   "personality": "沉稳寡言，手艺人的骄傲，对真诚的人会软化",
   "speech_style": "简短有力，偶尔提到炉火和铁的脾气，不用敬语",
   "backstory": "祖传三代铁匠，年轻时给镖局打过刀，最恨偷工减料",

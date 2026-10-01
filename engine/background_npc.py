@@ -19,6 +19,8 @@ class BackgroundNPC:
         self._role = config.get("role", "background")
         self._summary = config.get("summary", "")
         self._reactions: Dict[str, List[str]] = config.get("reactions", {})
+        self._residence = config.get("residence", config["location_id"])
+        self._schedule: Dict[str, str] = config.get("schedule", {})
         self._world = world
         self._reaction_counter: Dict[str, int] = {}
 
@@ -51,6 +53,16 @@ class BackgroundNPC:
     @property
     def summary(self) -> str:
         return self._summary
+
+    @property
+    def residence(self) -> str:
+        """居所地点 id（缺省时等于初始位置）。"""
+        return self._residence
+
+    @property
+    def schedule(self) -> Dict[str, str]:
+        """作息表（G6-A：本次先存储，后续阶段再应用）。"""
+        return self._schedule
 
     def _on_event(self, event: WorldEvent) -> None:
         """规则反应：按事件类型+位置过滤，确定性选择模板，发布 npc_action。"""
@@ -96,5 +108,6 @@ class BackgroundNPC:
             "id": self._id, "name": self._name, "role": self._role,
             "location_id": self._entity.location_id,
             "summary": self._summary,
+            "residence": self._residence,
             "type": "background",
         }

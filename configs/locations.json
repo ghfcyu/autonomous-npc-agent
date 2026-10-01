@@ -1,0 +1,19 @@
+[
+  {"id": "forge", "name": "铁匠铺", "x": 120, "y": 80, "category": "shop"},
+  {"id": "market", "name": "集市", "x": 340, "y": 90, "category": "shop"},
+  {"id": "bakery", "name": "面包铺", "x": 200, "y": 150, "category": "shop"},
+  {"id": "tavern", "name": "酒馆", "x": 60, "y": 180, "category": "shop"},
+  {"id": "clinic", "name": "医馆", "x": 280, "y": 200, "category": "shop"},
+  {"id": "plaza", "name": "中央广场", "x": 230, "y": 220, "category": "public"},
+  {"id": "well", "name": "水井边", "x": 160, "y": 280, "category": "public"},
+  {"id": "house_chen", "name": "陈家", "x": 100, "y": 300, "category": "residence"},
+  {"id": "house_lily", "name": "莉莉宅", "x": 360, "y": 260, "category": "residence"},
+  {"id": "house_zhang", "name": "张家", "x": 220, "y": 300, "category": "residence"},
+  {"id": "house_wang", "name": "王家", "x": 300, "y": 300, "category": "residence"},
+  {"id": "house_liu", "name": "刘家", "x": 180, "y": 330, "category": "residence"},
+  {"id": "house_sun", "name": "孙家", "x": 40, "y": 250, "category": "residence"},
+  {"id": "house_qin", "name": "秦家", "x": 320, "y": 330, "category": "residence"},
+  {"id": "house_zhou", "name": "周家", "x": 140, "y": 340, "category": "residence"},
+  {"id": "house_yang", "name": "杨家", "x": 380, "y": 300, "category": "residence"},
+  {"id": "house_zhao", "name": "赵家", "x": 250, "y": 340, "category": "residence"}
+]

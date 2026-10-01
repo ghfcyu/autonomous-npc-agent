@@ -1,4 +1,10 @@
 [
   {"source_id": "chen", "target_id": "old_zhang", "target_name": "老张", "relation": "父亲", "affinity": 0.9},
-  {"source_id": "lily", "target_id": "guard_wang", "target_name": "王守卫", "relation": "熟人", "affinity": 0.3}
+  {"source_id": "lily", "target_id": "guard_wang", "target_name": "王守卫", "relation": "熟人", "affinity": 0.3},
+  {"source_id": "chen", "target_id": "baker_liu", "target_name": "刘婶", "relation": "老主顾", "affinity": 0.4},
+  {"source_id": "lily", "target_id": "tavern_sun", "target_name": "孙老三", "relation": "供货商", "affinity": 0.5},
+  {"source_id": "old_zhang", "target_id": "doc_qin", "target_name": "秦大夫", "relation": "老友", "affinity": 0.7},
+  {"source_id": "guard_wang", "target_id": "fisher_zhou", "target_name": "周渔夫", "relation": "酒友", "affinity": 0.3},
+  {"source_id": "weaver_yang", "target_id": "lily", "target_name": "商人莉莉", "relation": "同行", "affinity": 0.2},
+  {"source_id": "baker_liu", "target_id": "farmer_zhao", "target_name": "赵老汉", "relation": "邻居", "affinity": 0.6}
 ]

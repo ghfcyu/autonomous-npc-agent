@@ -3,6 +3,7 @@
   "name": "老张",
   "role": "elder",
   "location_id": "market",
+  "residence": "house_zhang",
   "summary": "铁匠陈的父亲，退休的老铁匠",
   "reactions": {
     "env_event": [
@@ -12,5 +13,6 @@
     "entity_moved": [
       "{npc_name}打量着来人"
     ]
-  }
+  },
+  "schedule": {"6": "WORKING", "12": "IDLE", "20": "SLEEPING"}
 }

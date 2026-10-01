@@ -17,12 +17,12 @@ from engine.engine import NPCEngine
 from engine.llm import create_provider
 
 BANNER = """
-=====================================================
+====================================================
    autonomous-npc-agent  ·  AI NPC 引擎 CLI 演示
-=====================================================
+====================================================
 命令：
   look                         查看世界状态
-  goto <地点id>                移动（forge/market/plaza）
+  goto <地点id>                移动（{locations}）
   talk <npc_id> <一句话>        和 NPC 对话
   tick                         推进时间 10 分钟
   status                       查看 NPC 状态与记忆量
@@ -37,7 +37,7 @@ def main() -> None:
     args = parser.parse_args()
 
     engine = NPCEngine(llm=create_provider(args.llm), store_dir=args.store)
-    print(BANNER)
+    print(BANNER.format(locations=", ".join(sorted(engine.world.locations.keys()))))
     status = engine.status()
     for loc in status["world"]["locations"]:
         who = "、".join(loc["entities"]) or "（空无一人）"
@@ -68,7 +68,7 @@ def main() -> None:
         elif cmd == "goto" and len(parts) >= 2:
             result = engine.move_player(parts[1])
             print(f"你走到了 {result['location']}" if result["ok"]
-                  else "去不了那里。可选：forge / market / plaza")
+                  else f"去不了那里。可选：{', '.join(sorted(engine.world.locations.keys()))}")
         elif cmd == "talk" and len(parts) >= 3:
             npc_id, text = parts[1], parts[2]
             result = engine.player_says(text, npc_id)

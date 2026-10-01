@@ -1,0 +1,19 @@
+{
+  "id": "fisher_zhou",
+  "name": "周渔夫",
+  "role": "fisher",
+  "location_id": "well",
+  "summary": "每天去村外河里打鱼，话少",
+  "reactions": {
+    "env_event": [
+      "{npc_name}蹲在水井边，{summary}",
+      "{npc_name}理着渔网没抬头"
+    ],
+    "entity_moved": [
+      "{npc_name}点点头算打招呼"
+    ]
+  },
+  "inventory": ["鱼篓", "鱼竿"],
+  "residence": "house_zhou",
+  "schedule": {"5": "WORKING", "12": "IDLE", "21": "SLEEPING"}
+}

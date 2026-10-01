@@ -9,12 +9,18 @@
 
 from __future__ import annotations
 
+import json
+import os
 import random
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Deque, Dict, Iterable, List, Optional
+
+DEFAULT_LOCATIONS_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "configs", "locations.json")
 
 
 class Weather(str, Enum):
@@ -49,6 +55,7 @@ class Location:
     name: str
     x: int = 0
     y: int = 0
+    category: str = "public"  # shop / public / residence
 
 
 @dataclass
@@ -130,22 +137,62 @@ class World:
         self.game_minute = 8 * 60  # 从早上 8:00 开始
         self.weather = Weather.SUNNY
         self.bus = EventBus()
-        self.locations: Dict[str, Location] = {
-            loc.id: loc for loc in (locations or self._default_locations())
-        }
+        locs = locations if locations is not None else (
+            self._load_locations_from_file(DEFAULT_LOCATIONS_PATH)
+            or self._default_locations())
+        self.locations: Dict[str, Location] = {loc.id: loc for loc in locs}
         self.entities: Dict[str, Entity] = {}
         self.event_slot = event_slot or EventSlot()
         self._env_events = env_events if env_events is not None else list(self._DEFAULT_ENV_EVENTS)
 
     # ------------------------------------------------------------------ #
-    # 默认地图
+    # 地图：configs/locations.json 优先，内置默认清单兜底
     # ------------------------------------------------------------------ #
+    @staticmethod
+    def _load_locations_from_file(path: str) -> Optional[List[Location]]:
+        """从 JSON 数组文件加载地点清单。
+
+        文件不存在、读取/解析失败、或结果非非空列表（含空列表）时
+        返回 None，以便调用方回退到内置默认清单。
+        """
+        if not os.path.exists(path):
+            return None
+        try:
+            with open(path, encoding="utf-8") as fh:
+                data = json.load(fh)
+            if not isinstance(data, list) or not data:
+                return None
+            return [
+                Location(item["id"], item["name"], item["x"], item["y"],
+                         item.get("category", "public"))
+                for item in data
+            ]
+        except (OSError, ValueError, KeyError, TypeError):
+            return None
+
     @staticmethod
     def _default_locations() -> List[Location]:
         return [
-            Location("forge", "铁匠铺", 120, 80),
-            Location("market", "集市", 340, 90),
-            Location("plaza", "中央广场", 230, 220),
+            # 店铺
+            Location("forge", "铁匠铺", 120, 80, "shop"),
+            Location("market", "集市", 340, 90, "shop"),
+            Location("bakery", "面包铺", 200, 150, "shop"),
+            Location("tavern", "酒馆", 60, 180, "shop"),
+            Location("clinic", "医馆", 280, 200, "shop"),
+            # 公共空间
+            Location("plaza", "中央广场", 230, 220, "public"),
+            Location("well", "水井边", 160, 280, "public"),
+            # 居所
+            Location("house_chen", "陈家", 100, 300, "residence"),
+            Location("house_lily", "莉莉宅", 360, 260, "residence"),
+            Location("house_zhang", "张家", 220, 300, "residence"),
+            Location("house_wang", "王家", 300, 300, "residence"),
+            Location("house_liu", "刘家", 180, 330, "residence"),
+            Location("house_sun", "孙家", 40, 250, "residence"),
+            Location("house_qin", "秦家", 320, 330, "residence"),
+            Location("house_zhou", "周家", 140, 340, "residence"),
+            Location("house_yang", "杨家", 380, 300, "residence"),
+            Location("house_zhao", "赵家", 250, 340, "residence"),
         ]
 
     # ------------------------------------------------------------------ #

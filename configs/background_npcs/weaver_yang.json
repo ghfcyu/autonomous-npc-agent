@@ -1,0 +1,19 @@
+{
+  "id": "weaver_yang",
+  "name": "杨大姐",
+  "role": "weaver",
+  "location_id": "market",
+  "summary": "集市上摆布摊的织娘，和莉莉是同行",
+  "reactions": {
+    "env_event": [
+      "{npc_name}理着布匹，{summary}",
+      "{npc_name}嘴里念叨着布价"
+    ],
+    "entity_moved": [
+      "{npc_name}打量着来人的衣料"
+    ]
+  },
+  "inventory": ["棉布", "纺锤"],
+  "residence": "house_yang",
+  "schedule": {"6": "WORKING", "12": "IDLE", "20": "SLEEPING"}
+}

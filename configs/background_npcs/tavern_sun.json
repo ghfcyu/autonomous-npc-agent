@@ -1,0 +1,19 @@
+{
+  "id": "tavern_sun",
+  "name": "孙老三",
+  "role": "tavern_owner",
+  "location_id": "tavern",
+  "summary": "村口酒馆掌柜，爱讲江湖旧事",
+  "reactions": {
+    "env_event": [
+      "{npc_name}哼着小曲，{summary}",
+      "{npc_name}擦着酒碗听着"
+    ],
+    "entity_moved": [
+      "{npc_name}扯着嗓子：来喝一杯？"
+    ]
+  },
+  "inventory": ["米酒", "酱肉"],
+  "residence": "house_sun",
+  "schedule": {"8": "WORKING", "14": "IDLE", "22": "SLEEPING"}
+}

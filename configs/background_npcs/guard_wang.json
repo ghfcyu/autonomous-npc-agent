@@ -3,6 +3,7 @@
   "name": "王守卫",
   "role": "guard",
   "location_id": "plaza",
+  "residence": "house_wang",
   "summary": "村口的老守卫，日复一日守着村子",
   "reactions": {
     "env_event": [
@@ -13,5 +14,6 @@
       "{npc_name}注意到有人来了",
       "{npc_name}瞥了一眼来人"
     ]
-  }
+  },
+  "schedule": {"6": "WORKING", "12": "IDLE", "20": "SLEEPING"}
 }

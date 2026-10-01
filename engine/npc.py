@@ -40,6 +40,7 @@ class Persona:
     topic_responses: Dict[str, List[str]] = field(default_factory=dict)
     tags: Dict[str, float] = field(default_factory=dict)
     appearance: Dict[str, str] = field(default_factory=dict)
+    residence: str = ""
 
     @classmethod
     def from_file(cls, path: str) -> "Persona":
@@ -75,7 +76,8 @@ class Persona:
     def to_dict(self) -> Dict[str, Any]:
         return {"id": self.id, "name": self.name, "role": self.role,
                 "location_id": self.location_id, "personality": self.personality,
-                "speech_style": self.speech_style, "tags": self.tags}
+                "speech_style": self.speech_style, "tags": self.tags,
+                "residence": self.residence}
 
 
 class NPC:

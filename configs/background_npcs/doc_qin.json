@@ -1,0 +1,19 @@
+{
+  "id": "doc_qin",
+  "name": "秦大夫",
+  "role": "doctor",
+  "location_id": "clinic",
+  "summary": "村里唯一的医馆坐堂大夫，性子温和",
+  "reactions": {
+    "env_event": [
+      "{npc_name}捻着胡须，{summary}",
+      "{npc_name}叹了口气接着配药"
+    ],
+    "entity_moved": [
+      "{npc_name}抬头看了看来人面色"
+    ]
+  },
+  "inventory": ["草药", "针灸包"],
+  "residence": "house_qin",
+  "schedule": {"7": "WORKING", "12": "IDLE", "19": "SLEEPING"}
+}

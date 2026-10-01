@@ -1,0 +1,19 @@
+{
+  "id": "baker_liu",
+  "name": "刘婶",
+  "role": "baker",
+  "location_id": "bakery",
+  "summary": "村东头面包铺的老板娘，热心肠",
+  "reactions": {
+    "env_event": [
+      "{npc_name}闻了闻炉子，{summary}",
+      "{npc_name}擦了擦手上的面粉"
+    ],
+    "entity_moved": [
+      "{npc_name}笑着招呼来人尝口热面包"
+    ]
+  },
+  "inventory": ["面包", "面粉"],
+  "residence": "house_liu",
+  "schedule": {"6": "WORKING", "12": "IDLE", "13": "WORKING", "20": "SLEEPING"}
+}

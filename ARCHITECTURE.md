@@ -30,6 +30,7 @@ AIGC:
 
 - **EventSlot**（G3）：世界随机事件槽，每次交互/时间推进累积 +5%，满 100% 触发一个环境事件并归零。事件体现"NPC 有自己生活"（如铁匠陈想起该去收矿石了），通过 `_publish_env_event()` 确定性选择（基于 trigger_count 取模）并发布 `env_event` 类型事件，同地点 NPC 感知并写入短期记忆
 - **Entity.appearance**（G5）：实体可变外观（`outfit` 穿着 / `posture` 姿势 / `expression` 神情），`World.set_appearance()` 按键合并更新并发布 `appearance_change` 事件；快照 `nearby` 携带各实体外观副本。设计语义是"眼睛不是记忆"：同地点可见、异地不可见（既有感知过滤天然实现），importance 0.3 不直写长期记忆
+- **Location.category**（G6）：地点分类（`shop` 店铺 / `public` 公共空间 / `residence` 居所），支撑村庄可探索结构。`World` 默认从 `configs/locations.json` 加载地点清单（文件缺失/损坏/空列表回退内置默认 17 地点：5 店铺 + 2 公共 + 10 居所），测试可显式传 `locations=` 覆盖。`World.snapshot` 仍是局部感知（仅同地点实体），`NPCEngine.status` 的 `world.locations` 遍历全村庄用于总览展示
 
 ### 2. 记忆层（`engine/memory.py`）
 
@@ -105,7 +106,7 @@ WorldEvent（事件总线发布）
 ```
 
 - **BackgroundNPC**：轻量级 NPC，不持有 LLM 引用（架构上不可能调用 LLM），不维护记忆/内状态/状态机
-- **配置驱动**：`configs/background_npcs/*.json`（id/name/role/location_id/summary/reactions），NPCEngine 全默认构造时自动加载
+- **配置驱动**：`configs/background_npcs/*.json`（id/name/role/location_id/summary/reactions/inventory/residence/schedule），NPCEngine 全默认构造时自动加载；`residence` 为居所地点 id（缺省回退初始位置），`schedule` 为作息表（G6-A 先存储，后续阶段应用驱动 NPC 移动）
 - **规则反应**：对配置了模板的事件类型产生确定性反应——`env_event` 只反应同地点、`entity_moved` 只反应有人来到自己地点，模板按计数器取模轮转，`{npc_name}` 替换为 NPC 名
 - **零 LLM 断言**：MockLLMProvider 记录 `call_count`/`call_log`，测试可断言背景 NPC 的 id 从未出现在调用日志中
 
@@ -141,9 +142,9 @@ WorldEvent（事件总线发布）
 
 ### 6. 编排层（`engine/engine.py` + `engine/npc.py`）
 
-- `Persona`：JSON 配置 → 人格对象（性格、背景、语气、对话库、作息表、**标签**、**外观**）
+- `Persona`：JSON 配置 → 人格对象（性格、背景、语气、对话库、作息表、**标签**、**外观**、**居所**）
 - `NPC`：人格 + 记忆系统 + 状态机 + 决策引擎 + **内状态** 的聚合根，订阅事件总线（记忆写入 + 状态更新双订阅）
-- `NPCEngine`：世界 + NPC 集合的编排入口，暴露 `player_says / player_gives / player_changes_appearance / tick / status` 五个核心 API（`player_gives`：玩家送礼，库存转移或宽松发布事件，NPC 经事件链路记入短期+长期记忆；`player_changes_appearance`：玩家换装，同地点 NPC 感知）
+- `NPCEngine`：世界 + NPC 集合的编排入口，暴露 `player_says / player_gives / player_changes_appearance / tick / status` 五个核心 API（`player_gives`：玩家送礼，库存转移或宽松发布事件，NPC 经事件链路记入短期+长期记忆；`player_changes_appearance`：玩家换装，同地点 NPC 感知）。全默认构造时自动扫描 `configs/`（npcs + background_npcs + relationships + locations），加载小村庄：2 核心 NPC（chen/lily 跑完整决策链）+ 8 背景 NPC（零 LLM 规则反应）+ 17 地点（三类可探索）
 
 ## 数据流（一次对话）
 

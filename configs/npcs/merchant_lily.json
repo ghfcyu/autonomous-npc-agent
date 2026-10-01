@@ -3,6 +3,7 @@
   "name": "商人莉莉",
   "role": "merchant",
   "location_id": "market",
+  "residence": "house_lily",
   "personality": "热情健谈，精明但讲信誉，喜欢打听消息",
   "speech_style": "语速快，爱用感叹号，喜欢把话题绕回生意",
   "backstory": "跟着商队跑过五个城镇，见多识广，梦想开一间自己的铺子",

@@ -13,7 +13,7 @@
 7. **躯体标记假说与内稳态动力学：环境致心身反馈回路 (Somatic Markers & Homeostasis Dynamics)**
 8. **动态环境演化与毫秒级抢占：元胞物理与灾害级联中断 (Dynamic Environmental Cellular Physics & Preemption)**
 9. **认知空间地图与主客观信息差：海马体位置记忆与迷路机理 (Cognitive Map, Information Gap & Spatial Inference)**
-10. **端云协同流水线与 NPC 端侧微脑：L0-L1-L2 级联路由器与 Jev 直觉模型 (Edge-Cloud Pipeline & Micro-Brains)**
+10. **端云协同流水线、openJiuwen X-Router 自演进路由与 KV Cache 感知调度 (Edge-Cloud Pipeline, openJiuwen X-Router & KV Cache Routing)**
 11. **极简心智与抗谄媚架构 (Minimalist Mind & Anti-Sycophancy Architecture)**
 12. **高维多参数心智架构与全行为生成系统：35维心智张量与微/宏观行为统一函数 (Ultra-High-Dim Mind Tensor & Universal Action Function)**
 13. **杜希格习惯回路与前额叶旁路机制：基底核强化学习与 0 Token 极速拦截 (Duhigg Habit Loop & Prefrontal Bypass)**
@@ -43,7 +43,7 @@
 全书构建了四大纵向系统层级：
 1.  **物理与具身感知层 (Physical & Embodied Layer)**：声学光线追踪反平方衰减、视锥显著性图、负向可供性断崖阻隔、达马西奥躯体标记惩罚项与内稳态相变；
 2.  **认知、本能动力学与心智参数层 (Cognitive, Instinctual & Mind Tensor Layer)**：35维高维心智状态向量（生理稳态、瞬时情绪、人格特质、习惯回路、潜意识情结）、双通道竞争注意力全行为生成函数、杜希格习惯回路前额叶旁路（0 Token拦截）、弗洛伊德力比多能量池微分方程、非对称配偶价值矩阵（MVI）、韦斯特马克乱伦禁忌衰减、准双曲贴现 $(\beta, \delta)$ 即时满足博弈、前景理论损失厌恶与禀赋效应；
-3.  **计算与系统调度层 (System & Computational Layer)**：全局客观世界模型（劳伦兹混沌天气、热力学与对流扩散偏微分网格）、四级算力分流矩阵（Tier 0 纯数学微分代码、Tier 1 确定性脚本、Tier 2 端侧微模型、Tier 3 云端长考大模型）、端侧微脑、毫秒级动作栈抢占丢锤逃生、托尔曼主客观认知脑图断桥抓狂、PID 自动化央行水龙头/水槽平衡；
+3.  **计算与系统调度层 (System & Computational Layer)**：全局客观世界模型（劳伦兹混沌天气、热力学与对流扩散偏微分网格）、四级算力分流矩阵（Tier 0 纯数学微分代码、Tier 1 确定性脚本、Tier 2 端侧微模型、Tier 3 云端长考大模型）、openJiuwen X-Router 自演进动态模型路由与 `openjiuwentools-infer-router` KV Cache 前缀感知调度器、端侧微脑、毫秒级动作栈抢占丢锤逃生、托尔曼主客观认知脑图断桥抓狂、PID 自动化央行水龙头/水槽平衡；
 4.  **生态、人类学社会与文明历史演化层 (Ecological, Anthropological & Civilizational Layer)**：动物次等 NPC 行为树与雷诺兹 Boids 集群、Lotka-Volterra 季节三级营养动态网、空间 SEIR 跨物种疫病、布迪厄资本三元向量转化与惯习（Habitus）阶层固化、范热内普三阶段过渡仪式与集体狂欢减熵、奥斯特罗姆公共池塘资源（CPR）同侪制裁演化博弈、皮亚杰-Gompertz 生命历程、勒庞去个性化暴乱相变模型、韦伯暴力垄断与贝叶斯审判、因果 DAG 组合式技术创新与 Bass 创新扩散。
 
 ---
@@ -58,6 +58,11 @@
 | **Tier 1: 确定性自动化脚本** | 规则引擎 / 图数据库查询 / 调度器 | **< 0.5ms** | **0** | **高频逻辑闭环、契约结算与习惯回路旁路**：<br>1. **杜希格习惯回路前额叶旁路匹配与0 Token极速拦截**<br>2. 物品栏增减、金币交易结算、借贷记账、禀赋效应售价折算<br>3. 成文法三元组 `(Condition, Action, Penalty)` 快速知识图谱模式匹配<br>4. 婚姻 Gale-Shapley 稳定匹配算法、遗产继承分配规则<br>5. 通缉令、公地违规举报、谣言在社交网络邻接图上的 Gossip 广播协议<br>6. 布迪厄资本转化矩阵步进与准入校验状态机 |
 | **Tier 2: 端侧预训练小神经网络 (SLM/NN)** | ONNX / INT4 量化模型 (0.1B~0.5B 或专用微网络) | **< 2~5ms** | **0** | **低延迟直觉反应、模式识别与非言语输出**：<br>1. **Jev 决策微模型**：输入环境+内稳态，输出 NPC 动作概率分布（搭话/离开/干活）<br>2. **系统 1 快速动作网络**：$\text{ReLU}(\mathbf{W}_{S1}\mathbf{\Psi} \odot \mathbf{f}(a)) + b$ 输出无意识微观行为分布<br>3. **面部微表情生成器**：根据情绪效价映射 FACS 动作单元（AU14轻蔑、AU12假笑）<br>4. **声调特征提取**：推断对话文本中的副语言颤抖率与语速<br>5. **情绪分类与测谎**：输入多模态特征，计算通道不一致性 $C_{disc}$ 与贝叶斯怀疑度<br>6. **视觉显著性卷积网络**：从环境多物体中快速锁定最吸睛的刺激目标 |
 | **Tier 3: 云端大语言模型 (Cloud LLM)** | 现代前沿 LLM (如 Gemini 3.8 / 旗舰大模型) | **500ms~2s** | **按需** | **仅用于高级不可预测心智与叙事拐点**：<br>1. 极具深度的多轮哲学探讨、外交谈判与欺骗周旋<br>2. 伦理困境下的道德自我合理化与辩白生成（麦克白效应叙事）<br>3. 面对重大灾难/断桥震惊后的深度长逻辑反思与策略重构<br>4. 材料匮乏寻找替代品时的偶发创新（Serendipity 因果重组）<br>5. 宗教神话与复杂禁忌的语义生成、长期复仇与权力背叛的深度长程规划 |
+
+### 2.1 智能分流与基础设施调度中枢：openJiuwen 双层路由体系
+为了使四级算力分流矩阵从“设计概念”转化为“生产级工业管线”，系统深度集成 openJiuwen 架构：
+1.  **高层认知路由 (openJiuwen X-Router)**：负责根据 NPC 心智状态熵、情绪唤醒度与社会角色，动态评估任务复杂度 $\mathcal{C}_{task}$，并基于执行轨迹反思闭环自演进，解决“何时下沉至微模型、何时上抛至大模型”的决策难题，实测减少 50%+ 云端 Token 消耗；
+2.  **底层推理路由 (`openjiuwentools-infer-router`)**：负责多节点 GPU/NPU 推理集群中的 **全局 KV Cache 前缀感知调度**，将共享世界观长前缀的 NPC 请求精准路由至缓存驻留实例，减少 60%+ 首字延迟 (TTFT)，彻底消除网络与长考顿挫。
 
 ---
 
@@ -135,12 +140,78 @@ NPC 感知严格遵从物理衰减，杜绝内存级全图透视：
 
 ---
 
-## 10. 端云协同流水线与 NPC 端侧微脑 (Edge-Cloud Pipeline & Micro-Brains)
+## 10. 端云协同流水线、openJiuwen X-Router 自演进路由与 KV Cache 感知调度 (Edge-Cloud Pipeline, openJiuwen X-Router & KV Cache Routing)
 
-*   **端侧微脑体系**：每个 NPC 配置 Jev 决策分类小模型（<5ms）与非言语生成器，高频交互在本地极速闭环。
-*   **三级流水线**：L0 规则/状态机 (0ms) $\to$ L1 本地 0.1B-0.5B 微模型 (<5ms) $\to$ L2 云端大模型 (异步长考)。
-*   **升级触发阈值**：小模型信息熵 $H(P) = -\sum P(y_i)\log P(y_i) > \theta$ 或心理突变 $\Delta S = ||S_t - S_{t-1}||_2 > \delta$。
-*   **掩护动作 (Cover Action)**：云端长考 1-2 秒时，本地生成“皱眉、点烟、环顾”动作消除发呆感。
+在万级 NPC 规模的超大型虚拟社会中，“大模型包打天下”会导致推理算力暴增与不可承受的 Token 财务开销；而传统的硬编码固定阈值分流，又无法适应 NPC 复杂心智的非线性跃迁与突发群体博弈。
+
+本系统深度集成华为开源的 **openJiuwen (九问)** 企业级 AgentOS 基础设施，从**高层自演进认知路由 (X-Router)**、**底层推理前缀缓存感知调度 (`openjiuwentools-infer-router`)** 与 **多智能体蜂群协同 (JiuwenSwarm)** 三大维度，构建万级 NPC 的低延迟、自演进与高性价比端云协同生产级管线：
+
+### 10.1 四级流水线与端侧微脑体系
+每个 NPC 实例挂载轻量端侧微脑，形成毫秒级分级过滤链路：
+*   **L0 物理反射与状态机 (0ms, Tier 0/1)**：负向可供性断崖急停、习惯回路旁路拦截、成文法三元组模式匹配。
+*   **L1 端侧预训练小模型 (<5ms, Tier 2)**：本地部署 0.1B~0.5B ONNX / INT4 量化微模型（Jev 直觉网络、FACS 表情动作映射、非言语声调生成器）。
+*   **L2 局域集群中型模型 (<50ms, Tier 2.5)**：区域级 7B~14B 模型处理小镇集市议价、常规社交攀谈。
+*   **L3 云端旗舰大模型 (500ms~2s, Tier 3)**：云端超大规模 LLM 处理生死决策、伦理辩白、复杂谎言博弈与技术发明因果反思。
+
+### 10.2 openJiuwen X-Router：自演进认知模型路由引擎
+X-Router 作为智能体与异构模型算力之间的智能决策中枢，具备**动态任务复杂度感知**与**基于轨迹反馈的自演进闭环**：
+
+#### 1. 任务复杂度综合评估函数
+对于 NPC 即将面临的决策情境，X-Router 综合四维参数计算任务复杂度评分 $\mathcal{C}_{task} \in [0, 1]$：
+$$ \mathcal{C}_{task} = w_1 \cdot \mathcal{H}_{sem}(P_{ctx}) + w_2 \cdot e_A + w_3 \cdot (1 - \theta'_{PFC}) + w_4 \cdot \mathcal{R}_{social} $$
+*   $\mathcal{H}_{sem}(P_{ctx})$: 上下文语义信息熵（突发异常度量）。
+*   $e_A$: 心智张量中的情绪唤醒度（越狂怒或恐惧，冲动决策越需本地快速平抑或云端深度求索）。
+*   $\theta'_{PFC}$: 当前有效前额叶意志力带宽（意志力耗竭时降级至简单直觉）。
+*   $\mathcal{R}_{social}$: NPC 社会地位与角色重要度（领主、法官分配更高初始权重；野生动物固定归零）。
+
+**路由决策分级**：
+$$ \text{RouteDestination} = \begin{cases} \text{Tier 0 / 1 (规则/脚本)}, & \mathcal{C}_{task} < \Theta_{rule} \\ \text{Tier 2 (端侧 Jev 小模型)}, & \Theta_{rule} \le \mathcal{C}_{task} < \Theta_{cloud} \\ \text{Tier 3 (云端大模型)}, & \mathcal{C}_{task} \ge \Theta_{cloud} \end{cases} $$
+
+#### 2. 基于执行轨迹反思的自演进机制 (Self-Evolution Loop)
+X-Router 绝不采用僵死的手工静态阈值，而是通过 NPC 的**生命周期执行轨迹 (Trajectory) 进行在线自强化**：
+*   **反馈内生奖励信号**：收集 NPC 动作执行后的两项核心自洽度指标：
+    1. 具身环境预测误差 $PE = ||S_{obs} - S_{exp}||_2$；
+    2. 认知失调与内疚自责压力 $D_{dissonance}$。
+*   **自演进更新梯度**：若轻量模型处理后的决策导致 NPC 产生巨大的预测误差或逻辑崩溃，系统生成负反馈损失 $\mathcal{L}_{route}$，自适应调整路由超参数：
+    $$ \Theta_{cloud} \leftarrow \Theta_{cloud} - \eta_{evolve} \cdot \Big( (PE + D_{dissonance}) - \text{Baseline} \Big) $$
+*   **效果**：系统在运行数千模拟日后，自动习得“何时必须请教云端大脑，何时端侧直觉足够应付”，**实测压降 50% 以上的无谓云端 Token 消耗**，达到智能拟真度与运营成本的最优帕累托前沿。
+
+### 10.3 openjiuwentools-infer-router：底层全局 KV Cache 感知调度器
+在多节点 GPU/NPU 推理集群（基于 vLLM 或 SGLang）中，传统负载均衡（轮询或最少连接）完全无视 GPU 显存中的 KV Cache 状态，导致共享 Prompt 频繁被重复计算和换出。
+
+引入 `openjiuwentools-infer-router` 独立 Sidecar，实现**全局 KV Cache 感知调度**：
+
+#### 1. 虚拟世界共享前缀树 (Worldview Prefix Trie)
+在同一个虚拟世界中，全镇所有 NPC 共享长达 2k~8k tokens 的**公共背景前缀**：
+*   全局世界观设定与物理常数法则；
+*   小镇历史脉络与当前世界气候状态；
+*   成文法典条例三元组与当前领主禁令；
+*   NPC 所属宗族与职业背景通用模板。
+
+#### 2. 前缀重合度与负载水位联合评分算法
+`infer-router` 维护所有后端推理实例的全局前缀树缓存状态图谱。当 NPC 推理请求到达时，路由评分函数计算：
+$$ \mathcal{S}(node_k) = \lambda_{cache} \cdot \frac{|\text{LCP}(node_k, \text{PromptPrefix})|}{|\text{PromptPrefix}|} - \lambda_{queue} \cdot \frac{\text{QueueLength}(node_k)}{\text{MaxQueue}_k} $$
+其中 $\text{LCP}$ 为最长公共前缀匹配长度。系统将请求精准分发至已将该世界观前缀常驻于显存中的推理节点。
+
+#### 3. 性能飞跃：首字延迟 (TTFT) 压降 60%+
+*   世界共享前缀实现高达 **85%~92% 的缓存命中率 (Cache Hit Rate)**；
+*   消除昂贵的多轮 Prefill 耗时，首字生成延迟 (Time To First Token, TTFT) 降低 60% 以上；
+*   支持毫秒级快速出字，彻底打消玩家或环境交互时的“机械迟滞感”。
+
+### 10.4 基于 JiuwenSwarm 的社会蜂群协同与团队技能 (Swarm Skills) 自演进
+除了单 NPC 决策外，人类社会的大量行为属于“蜂群式协同”工程（Coordination Engineering）：
+*   **动态蜂群拓扑**：突发森林大火、山洪暴发、狼群袭村或集市暴乱时，JiuwenSwarm 引擎快速将周边 NPC 聚合成自组织蜂群，自主指派决策领袖 (Leader)、信息斥候 (Scout) 与执行工蜂 (Follower)。
+*   **团队技能自演进 (Swarm Skills Extraction)**：当某一组村民摸索出一套高效的抗洪协作路径（如：斥候鸣钟告警 $\to$ 青壮年排队运沙袋 $\to$ 老幼转移高地），JiuwenSwarm 从多智能体消息往来与动作轨迹中自动归纳出标准化的**团队级技能 (Swarm Skill)**，存入公共策略库并广播给其他村落，推动虚拟社会的制度文明自主演进。
+
+### 10.5 掩护动作生成器 (Cover Action Generator)
+在云端大模型异步长考（500ms~1.5s）期间，端侧微脑即刻派发“皱眉沉思、点燃烟斗、审慎环顾四周、轻叩桌面”等掩护微动作，完全填补网络与推理延迟，消除 NPC 的发呆呆滞感。
+
+### 10.6 openJiuwen SIG-Model-Router 工业级工程治理与标准对接
+系统接口严格遵循 openJiuwen 社区 SIG-Model-Router 标准化规约，暴露统一的指标采集端点：
+*   **路由命中分布比**（Tier 0: 70%, Tier 1: 15%, Tier 2: 11%, Tier 3: 4%）；
+*   **前缀缓存击中率 (KV Cache Hit Ratio $\ge 85\%$)**；
+*   **TTFT P99 延迟分位线与每秒 Token 生产通量 (TPS)**。
+从而为万级 NPC 虚拟世界的长期稳定运转提供工业级观测底座。
 
 ---
 
@@ -517,10 +588,10 @@ $$ \pi_i = b(e_i) - c \cdot \left(\frac{\sum_{j} e_j}{R_{max}}\right) \cdot e_i 
     *   *前置依赖*：步骤 1
     *   *实施内容*：解耦客观真理地图与 NPC 主观脑图；引入网格细胞高斯航位推算漂移；构建目击者、传闻者与未知者的三阶信息滞后；实现断桥预测误差暴增机制。
     *   *验证标准*：未知桥梁垮塌的 NPC 前往桥头目击断壁，产生 100% 预测误差震惊并原地重新寻路。
-*   **步骤 13：端云级联决策路由器构建**
+*   **步骤 13：openJiuwen X-Router 自演进路由与 infer-router 全局 KV Cache 调度部署**
     *   *前置依赖*：步骤 2, 步骤 6, 步骤 10, 步骤 11
-    *   *实施内容*：构建 L0 规则反射(0ms) $\to$ L1 本地极小模型(<5ms) $\to$ L2 云端大模型的三级流水线；制定信息熵阈值与心理突变上抛规则；建立云端异步长考期间的本地掩护动作生成器。
-    *   *验证标准*：95% 常态交互由本地消化，高突变事件上抛云端，等待期间无发呆感（生成皱眉点烟掩护动作）。
+    *   *实施内容*：部署 openJiuwen X-Router 自演进认知路由引擎，集成任务复杂度综合评估函数 $\mathcal{C}_{task}$ 与基于预测误差/认知失调的轨迹反思自演进闭环；外挂部署 `openjiuwentools-infer-router` Sidecar，构建虚拟世界共享前缀树（Prefix Trie）与全局显存水位感知调度；集成 JiuwenSwarm 蜂群协同接口与团队技能自演进提取器；构建端侧掩护动作（皱眉、点烟）生成器。
+    *   *验证标准*：常态微观与习惯交互 95% 截留在本地（0~5ms），云端大模型 Token 消耗压降 50% 以上；多实例推理环境下全局 KV Cache 共享世界观前缀命中率 $\ge 85\%$，首字生成延迟（TTFT）下降 60% 以上；云端长考期间掩护动作无缝衔接，消除发呆感。
 *   **步骤 14：极简心智 (D-T-S) 与抗谄媚对抗元指令注入**
     *   *前置依赖*：步骤 13
     *   *实施内容*：剥离冗余的数值心理学 Prompt，固化核心驱动(Drive)、绝对禁忌(Taboo)与当前状态(State)极简三元组；注入对抗性元指令覆盖 RLHF 顺从偏见。

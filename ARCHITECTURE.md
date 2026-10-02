@@ -108,7 +108,7 @@ WorldEvent（事件总线发布）
 - **BackgroundNPC**：轻量级 NPC，不持有 LLM 引用（架构上不可能调用 LLM），不维护记忆/内状态/状态机
 - **配置驱动**：`configs/background_npcs/*.json`（id/name/role/location_id/summary/reactions/inventory/residence/schedule），NPCEngine 全默认构造时自动加载；`residence` 为居所地点 id（缺省回退初始位置），`schedule` 为作息表（G6-A 先存储，后续阶段应用驱动 NPC 移动）
 - **规则反应**：对配置了模板的事件类型产生确定性反应——`env_event` 只反应同地点、`entity_moved` 只反应有人来到自己地点，模板按计数器取模轮转，`{npc_name}` 替换为 NPC 名
-- **零 LLM 断言**：MockLLMProvider 记录 `call_count`/`call_log`，测试可断言背景 NPC 的 id 从未出现在调用日志中
+- **零 LLM 断言**：MockLLMProvider 记录 `call_count`/`call_log` 与 `total_tokens_used`，测试可断言背景 NPC 的 id 从未出现在调用日志中、且 `total_tokens_used == 0`（以 token 数非调用次数证明零 LLM）
 
 ### 3. 决策层（`engine/decision.py`）
 
@@ -136,15 +136,15 @@ WorldEvent（事件总线发布）
 
 ### 5. LLM Provider（`engine/llm/`）
 
-- `BaseLLMProvider.chat(messages) -> str`：唯一抽象
-- `OpenAICompatProvider`：urllib 实现，兼容任意 OpenAI 协议端点（含本地模型），环境变量 `NPC_LLM_BASE_URL / NPC_LLM_API_KEY / NPC_LLM_MODEL`
-- `MockLLMProvider`：基于人格对话库 + 关键词规则的确定性实现，用于离线开发与测试
+- `BaseLLMProvider.chat(messages) -> str`：唯一抽象；`last_usage`（prompt/completion/total_tokens）与 `total_tokens_used` 为 token 度量默认值，子类在 chat 中更新
+- `OpenAICompatProvider`：urllib 实现，兼容任意 OpenAI 协议端点（含本地模型），环境变量 `NPC_LLM_BASE_URL / NPC_LLM_API_KEY / NPC_LLM_MODEL`；从响应 `body["usage"]` 读取真实 token 用量
+- `MockLLMProvider`：基于人格对话库 + 关键词规则的确定性实现，用于离线开发与测试；按字符数估算 token（`prompt=len(system)+len(user)`、`completion=len(response)`），话题匹配仅扫描【玩家说】段避免地点名/外观文本误触发
 
 ### 6. 编排层（`engine/engine.py` + `engine/npc.py`）
 
 - `Persona`：JSON 配置 → 人格对象（性格、背景、语气、对话库、作息表、**标签**、**外观**、**居所**）
 - `NPC`：人格 + 记忆系统 + 状态机 + 决策引擎 + **内状态** 的聚合根，订阅事件总线（记忆写入 + 状态更新双订阅）
-- `NPCEngine`：世界 + NPC 集合的编排入口，暴露 `player_says / player_gives / player_changes_appearance / tick / status` 五个核心 API（`player_gives`：玩家送礼，库存转移或宽松发布事件，NPC 经事件链路记入短期+长期记忆；`player_changes_appearance`：玩家换装，同地点 NPC 感知）。全默认构造时自动扫描 `configs/`（npcs + background_npcs + relationships + locations），加载小村庄：2 核心 NPC（chen/lily 跑完整决策链）+ 8 背景 NPC（零 LLM 规则反应）+ 17 地点（三类可探索）
+- `NPCEngine`：世界 + NPC 集合的编排入口，暴露 `player_says / player_gives / player_changes_appearance / tick / status` 五个核心 API（`player_gives`：玩家送礼，库存转移或宽松发布事件，NPC 经事件链路记入短期+长期记忆；`player_changes_appearance`：玩家换装，同地点 NPC 感知）。全默认构造时自动扫描 `configs/`（npcs + background_npcs + relationships + locations），加载小村庄：2 核心 NPC（chen/lily 跑完整决策链）+ 8 背景 NPC（零 LLM 规则反应）+ 17 地点（三类可探索）。`player_says` 后按 NPC 聚合 token 统计（`token_stats`），`status()` 返回 `token_stats` 字段（`by_npc` 按 NPC 聚合 prompt/completion/total/calls，`total_tokens` 为 LLM 累计，`llm_calls` 为调用次数）
 
 ## 数据流（一次对话）
 

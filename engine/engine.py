@@ -38,6 +38,7 @@ class NPCEngine:
         self.llm = llm or create_provider()
         self.store_dir = store_dir
         self.npcs: Dict[str, NPC] = {}
+        self.token_stats: Dict[str, Dict[str, int]] = {}
 
         # 关系网：显式传入 > 默认文件 > 空网络
         if relationships is not None:
@@ -103,6 +104,16 @@ class NPCEngine:
 
         # 4) 行动：执行并回流事件
         reply = npc.executor.execute(action, npc)
+
+        # Token 度量：核心 NPC 对话后聚合（背景 NPC 零 LLM 不进入此路径）
+        usage = getattr(self.llm, "last_usage",
+                        {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0})
+        stats = self.token_stats.setdefault(
+            npc_id, {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "calls": 0})
+        stats["prompt_tokens"] += usage.get("prompt_tokens", 0)
+        stats["completion_tokens"] += usage.get("completion_tokens", 0)
+        stats["total_tokens"] += usage.get("total_tokens", 0)
+        stats["calls"] += 1
 
         # 记忆巩固（溢出才触发）
         npc.memory.consolidate()
@@ -184,6 +195,11 @@ class NPCEngine:
                  "summary": e.payload.get("summary") or e.payload.get("text") or e.kind}
                 for e in list(self.world.bus.history)[-12:][::-1]
             ],
+            "token_stats": {
+                "by_npc": self.token_stats,
+                "total_tokens": getattr(self.llm, "total_tokens_used", 0),
+                "llm_calls": getattr(self.llm, "call_count", 0),
+            },
         }
 
     def move_player(self, location_id: str) -> Dict[str, Any]:

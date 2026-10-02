@@ -84,11 +84,13 @@ class TestVillage(unittest.TestCase):
         engine = self.engine
         # 构造后 call_count 必为 0
         self.assertEqual(engine.llm.call_count, 0)
+        self.assertEqual(engine.llm.total_tokens_used, 0)
 
         # (a) accumulate_event_slot(1.0) 立即触发默认环境事件池
         for _ in range(10):
             engine.world.accumulate_event_slot(1.0)
         self.assertEqual(engine.llm.call_count, 0)
+        self.assertEqual(engine.llm.total_tokens_used, 0)
 
         # (b) 直接发布 env_event，覆盖核心 NPC 所在地点
         for _ in range(5):
@@ -99,6 +101,7 @@ class TestVillage(unittest.TestCase):
                 engine.world.tick_count, "env_event", "lily",
                 {"summary": "测试环境事件"}))
         self.assertEqual(engine.llm.call_count, 0)
+        self.assertEqual(engine.llm.total_tokens_used, 0)
 
         # (c) 将玩家移至每个背景 NPC 所在地并发布 env_event，保证反应
         for bg_id, bg in engine.background_npcs.items():
@@ -107,11 +110,13 @@ class TestVillage(unittest.TestCase):
                 engine.world.tick_count, "env_event", "player",
                 {"summary": "测试环境事件"}))
         self.assertEqual(engine.llm.call_count, 0)
+        self.assertEqual(engine.llm.total_tokens_used, 0)
 
         # (d) 多轮 tick 推进时间
         for _ in range(10):
             engine.tick(60)
         self.assertEqual(engine.llm.call_count, 0)
+        self.assertEqual(engine.llm.total_tokens_used, 0)
 
         # 全程零 LLM 已验证；断言背景 NPC 有规则反应
         npc_actions = [e for e in engine.world.bus.history

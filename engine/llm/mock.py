@@ -31,6 +31,8 @@ class MockLLMProvider(BaseLLMProvider):
         self._seen: Dict[str, int] = {}  # npc_id -> 交互次数
         self.call_count: int = 0
         self.call_log: List[str] = []  # 记录每次 chat 调用的 persona_id
+        self.last_usage: Dict[str, int] = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        self.total_tokens_used: int = 0
 
     def chat(self, messages: List[Dict[str, str]], temperature: float = 0.7) -> str:
         self.call_count += 1
@@ -46,19 +48,38 @@ class MockLLMProvider(BaseLLMProvider):
         banks = self._extract_banks(system)
 
         if self.chaos_rate and self._rng.random() < self.chaos_rate:
-            return "这不是JSON {{{ 我随便说说"
+            response = "这不是JSON {{{ 我随便说说"
+            prompt_tokens = len(system) + len(user)
+            completion_tokens = len(response)
+            total = prompt_tokens + completion_tokens
+            self.last_usage = {"prompt_tokens": prompt_tokens,
+                               "completion_tokens": completion_tokens,
+                               "total_tokens": total}
+            self.total_tokens_used += total
+            return response
 
         count = self._seen.get(persona_id, 0)
         self._seen[persona_id] = count + 1
 
         # 话题匹配优先；首次交互且未命中话题时才打招呼
-        text = self._match_topics(user, banks)
+        # 话题匹配只针对【玩家说】段，避免地点名/外观文本误触发
+        player_match = re.search(r"【玩家说】(.*)", user, re.DOTALL)
+        topic_input = player_match.group(1).strip() if player_match else user
+        text = self._match_topics(topic_input, banks)
         if not text:
             if count == 0 and banks.get("greeting_bank"):
                 text = self._pick(banks["greeting_bank"])
             else:
                 text = self._pick(banks.get("fallback_bank") or ["……"])
-        return json.dumps({"action": "speak", "text": text}, ensure_ascii=False)
+        response = json.dumps({"action": "speak", "text": text}, ensure_ascii=False)
+        prompt_tokens = len(system) + len(user)
+        completion_tokens = len(response)
+        total = prompt_tokens + completion_tokens
+        self.last_usage = {"prompt_tokens": prompt_tokens,
+                           "completion_tokens": completion_tokens,
+                           "total_tokens": total}
+        self.total_tokens_used += total
+        return response
 
     # ------------------------------------------------------------------ #
     def _extract_banks(self, system: str) -> Dict[str, List[str]]:

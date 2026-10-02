@@ -1,107 +1,158 @@
-<mxGraphModel dx="1200" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="1000" math="0" shadow="0">
+<mxGraphModel dx="1500" dy="1100" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1100" math="0" shadow="0">
   <root>
     <mxCell id="0" />
     <mxCell id="1" parent="0" />
 
-    <mxCell id="2" value="玩家 / 游戏事件&#10;玩家输入 · 时间推进 · 送礼互动" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontStyle=1" vertex="1" parent="1">
-      <mxGeometry x="450" y="30" width="300" height="60" as="geometry" />
+    <mxCell id="2" value="玩家 / 游戏事件&#10;玩家输入 · 时间推进 · 送礼互动 · 换装" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontStyle=1" vertex="1" parent="1">
+      <mxGeometry x="500" y="20" width="400" height="60" as="geometry" />
     </mxCell>
 
     <mxCell id="3" value="感知 / 世界层" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=15;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
-      <mxGeometry x="200" y="130" width="800" height="130" as="geometry" />
+      <mxGeometry x="60" y="100" width="1280" height="230" as="geometry" />
     </mxCell>
-    <mxCell id="4" value="World 世界状态&#10;时间 · 天气 · 地点 · 物品" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12" vertex="1" parent="1">
-      <mxGeometry x="230" y="180" width="230" height="60" as="geometry" />
+    <mxCell id="4" value="World 世界状态&#10;时间 · 天气 · 地点 · 物品&#10;Entity.appearance&#10;(outfit穿着/posture姿态/expression神情)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12" vertex="1" parent="1">
+      <mxGeometry x="90" y="145" width="280" height="120" as="geometry" />
     </mxCell>
-    <mxCell id="5" value="EventBus 事件总线&#10;发布 / 订阅 · 事件历史" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12" vertex="1" parent="1">
-      <mxGeometry x="485" y="180" width="230" height="60" as="geometry" />
+    <mxCell id="5" value="EventBus 事件总线&#10;发布/订阅 · 事件历史&#10;事件类型: player_spoke / item_given /&#10;env_event / appearance_change / npc_action" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12" vertex="1" parent="1">
+      <mxGeometry x="400" y="145" width="310" height="120" as="geometry" />
     </mxCell>
-    <mxCell id="6" value="EventSlot 随机事件槽&#10;世界自发产生事件（+5%累积）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12" vertex="1" parent="1">
-      <mxGeometry x="740" y="180" width="230" height="60" as="geometry" />
+    <mxCell id="6" value="EventSlot 随机事件槽&#10;+5%累积 → 满100%触发env_event&#10;世界自发产生事件" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12" vertex="1" parent="1">
+      <mxGeometry x="740" y="145" width="260" height="100" as="geometry" />
     </mxCell>
-
-    <mxCell id="7" value="记忆层 MemorySystem" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=15;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
-      <mxGeometry x="100" y="330" width="440" height="170" as="geometry" />
+    <mxCell id="7" value="Location.category 三类&#10;shop 店铺(5) / public 公共(2) / residence 居所(10)&#10;configs/locations.json&#10;→ World._load_locations_from_file" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12" vertex="1" parent="1">
+      <mxGeometry x="1040" y="145" width="270" height="140" as="geometry" />
     </mxCell>
-    <mxCell id="8" value="短期记忆&#10;当前会话 · 容量30" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=12" vertex="1" parent="1">
-      <mxGeometry x="130" y="380" width="180" height="60" as="geometry" />
-    </mxCell>
-    <mxCell id="9" value="长期记忆&#10;持久化 JSON · 标签检索" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=12" vertex="1" parent="1">
-      <mxGeometry x="330" y="380" width="180" height="60" as="geometry" />
-    </mxCell>
-    <mxCell id="10" value="事件驱动直写（importance≥0.7 高价值事件实时入长期） + 定期巩固摘要" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontColor=#557755" vertex="1" parent="1">
-      <mxGeometry x="120" y="455" width="400" height="30" as="geometry" />
+    <mxCell id="7a" value="appearance_change 链路: set_appearance() → appearance_change事件 → NPC感知(同地点) → snapshot nearby携带外观 → 【周围的人】" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontColor=#4477aa" vertex="1" parent="1">
+      <mxGeometry x="90" y="280" width="910" height="35" as="geometry" />
     </mxCell>
 
-    <mxCell id="11" value="内状态层 InnerState" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=15;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
-      <mxGeometry x="660" y="330" width="440" height="170" as="geometry" />
+    <mxCell id="8" value="记忆层 MemorySystem" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=15;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
+      <mxGeometry x="60" y="360" width="400" height="180" as="geometry" />
     </mxCell>
-    <mxCell id="12" value="5维参数向量&#10;兴奋度·心情·精力·压力·信任" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;fontSize=12" vertex="1" parent="1">
-      <mxGeometry x="690" y="380" width="180" height="60" as="geometry" />
+    <mxCell id="9" value="短期记忆&#10;当前会话 · 容量30" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=12" vertex="1" parent="1">
+      <mxGeometry x="80" y="410" width="170" height="60" as="geometry" />
     </mxCell>
-    <mxCell id="13" value="StateUpdater&#10;规则引擎 · 挂事件总线实时更新" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;fontSize=12" vertex="1" parent="1">
-      <mxGeometry x="890" y="380" width="180" height="60" as="geometry" />
+    <mxCell id="10" value="长期记忆&#10;持久化JSON · 标签检索" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=12" vertex="1" parent="1">
+      <mxGeometry x="270" y="410" width="170" height="60" as="geometry" />
     </mxCell>
-    <mxCell id="14" value="心理 · 物理 · 社会三层标签（可推断人格，标签影响参数增量幅度）" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontColor=#996600" vertex="1" parent="1">
-      <mxGeometry x="680" y="455" width="400" height="30" as="geometry" />
-    </mxCell>
-
-    <mxCell id="15" value="决策层 DecisionEngine（混合决策）" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=15;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
-      <mxGeometry x="200" y="560" width="800" height="130" as="geometry" />
-    </mxCell>
-    <mxCell id="16" value="状态机&#10;硬约束（作息/迁移）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=12" vertex="1" parent="1">
-      <mxGeometry x="230" y="610" width="170" height="60" as="geometry" />
-    </mxCell>
-    <mxCell id="17" value="内状态硬规则&#10;压力过高拒单 · 精力低收摊" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=12" vertex="1" parent="1">
-      <mxGeometry x="420" y="610" width="180" height="60" as="geometry" />
-    </mxCell>
-    <mxCell id="18" value="LLM 柔性表达&#10;对话生成（Provider 可插拔）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=12" vertex="1" parent="1">
-      <mxGeometry x="620" y="610" width="180" height="60" as="geometry" />
-    </mxCell>
-    <mxCell id="19" value="轻量 NPC&#10;纯规则路径 · 零 LLM 调用" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=12;fontStyle=2" vertex="1" parent="1">
-      <mxGeometry x="820" y="610" width="150" height="60" as="geometry" />
+    <mxCell id="11" value="事件驱动直写(importance≥0.7实时入长期) + 定期巩固摘要" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontColor=#557755" vertex="1" parent="1">
+      <mxGeometry x="70" y="485" width="380" height="40" as="geometry" />
     </mxCell>
 
-    <mxCell id="20" value="行动层" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=15;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
-      <mxGeometry x="200" y="740" width="800" height="120" as="geometry" />
+    <mxCell id="12" value="关系网络层 RelationshipNetwork" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=15;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
+      <mxGeometry x="500" y="360" width="380" height="180" as="geometry" />
     </mxCell>
-    <mxCell id="21" value="ActionValidator&#10;动作白名单 + 状态/世界一致性校验" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12" vertex="1" parent="1">
-      <mxGeometry x="230" y="790" width="250" height="55" as="geometry" />
+    <mxCell id="13" value="Relationship&#10;source→target · 类型(父子/熟人/宿敌)&#10;好感值(-1.0~1.0)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=12" vertex="1" parent="1">
+      <mxGeometry x="520" y="410" width="340" height="70" as="geometry" />
     </mxCell>
-    <mxCell id="22" value="ActionExecutor&#10;执行动作 · 产出新事件回流总线" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12" vertex="1" parent="1">
-      <mxGeometry x="520" y="790" width="250" height="55" as="geometry" />
-    </mxCell>
-
-    <mxCell id="23" value="世界状态变更 / 新事件" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontStyle=1" vertex="1" parent="1">
-      <mxGeometry x="450" y="920" width="300" height="50" as="geometry" />
+    <mxCell id="14" value="RelationshipNetwork&#10;query() / to_prompt_text()&#10;configs/relationships.json (8条)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=12" vertex="1" parent="1">
+      <mxGeometry x="520" y="490" width="340" height="40" as="geometry" />
     </mxCell>
 
-    <mxCell id="30" value="事件流入" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11" edge="1" parent="1" source="2" target="3">
+    <mxCell id="16" value="内状态层 InnerState" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=15;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
+      <mxGeometry x="920" y="360" width="420" height="180" as="geometry" />
+    </mxCell>
+    <mxCell id="17" value="5维参数向量&#10;arousal·mood·energy&#10;·stress·trust" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;fontSize=12" vertex="1" parent="1">
+      <mxGeometry x="940" y="410" width="180" height="70" as="geometry" />
+    </mxCell>
+    <mxCell id="18" value="StateUpdater&#10;规则引擎 · 挂事件总线&#10;实时更新" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;fontSize=12" vertex="1" parent="1">
+      <mxGeometry x="1140" y="410" width="180" height="70" as="geometry" />
+    </mxCell>
+    <mxCell id="19" value="心理·物理·社会三层标签（可推断人格，标签影响参数增量幅度）" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontColor=#996600" vertex="1" parent="1">
+      <mxGeometry x="930" y="495" width="400" height="30" as="geometry" />
+    </mxCell>
+
+    <mxCell id="20" value="背景 NPC 层 BackgroundNPC（独立 EventBus 订阅 · 零 LLM）" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=13;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
+      <mxGeometry x="60" y="580" width="520" height="200" as="geometry" />
+    </mxCell>
+    <mxCell id="21" value="BackgroundNPC&#10;EventBus订阅者·不持有LLM引用&#10;residence居所 / schedule作息&#10;(G6-A 先存储，后续驱动)&#10;configs/background_npcs/*.json" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;fontSize=12" vertex="1" parent="1">
+      <mxGeometry x="80" y="630" width="220" height="110" as="geometry" />
+    </mxCell>
+    <mxCell id="22" value="规则反应引擎&#10;事件类型过滤 + 位置过滤&#10;模板轮转 → 格式化" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;fontSize=12" vertex="1" parent="1">
+      <mxGeometry x="330" y="630" width="220" height="110" as="geometry" />
+    </mxCell>
+    <mxCell id="23" value="→ 发布 npc_action 事件回流 EventBus → 同地点核心NPC感知写入记忆 · 全程零 LLM / 零 token" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontColor=#666666" vertex="1" parent="1">
+      <mxGeometry x="70" y="745" width="500" height="25" as="geometry" />
+    </mxCell>
+
+    <mxCell id="24" value="决策层 DecisionEngine（混合决策 · 核心 NPC）" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=15;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
+      <mxGeometry x="620" y="580" width="720" height="200" as="geometry" />
+    </mxCell>
+    <mxCell id="25" value="状态机&#10;硬约束(作息/迁移)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=12" vertex="1" parent="1">
+      <mxGeometry x="640" y="625" width="160" height="70" as="geometry" />
+    </mxCell>
+    <mxCell id="26" value="内状态硬规则&#10;压力&gt;0.8拒单&#10;精力&lt;0.15收摊" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=12" vertex="1" parent="1">
+      <mxGeometry x="820" y="625" width="160" height="70" as="geometry" />
+    </mxCell>
+    <mxCell id="27" value="LLM 柔性表达&#10;对话生成&#10;(Provider可插拔)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=12" vertex="1" parent="1">
+      <mxGeometry x="1000" y="625" width="160" height="70" as="geometry" />
+    </mxCell>
+    <mxCell id="28" value="决策上下文注入：&#10;【此刻内心】InnerState  ·  【周围的人】snapshot nearby+外观  ·  【人际关系】RelationshipNetwork" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=12;fontStyle=1" vertex="1" parent="1">
+      <mxGeometry x="640" y="710" width="680" height="55" as="geometry" />
+    </mxCell>
+
+    <mxCell id="29" value="行动层" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=15;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
+      <mxGeometry x="200" y="820" width="1000" height="110" as="geometry" />
+    </mxCell>
+    <mxCell id="30" value="ActionValidator&#10;动作白名单 + 状态/世界一致性校验" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12" vertex="1" parent="1">
+      <mxGeometry x="230" y="865" width="440" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="31" value="ActionExecutor&#10;执行动作 · 产出新事件回流总线" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12" vertex="1" parent="1">
+      <mxGeometry x="700" y="865" width="440" height="50" as="geometry" />
+    </mxCell>
+
+    <mxCell id="32" value="世界状态变更 / 新事件" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontStyle=1" vertex="1" parent="1">
+      <mxGeometry x="500" y="960" width="400" height="50" as="geometry" />
+    </mxCell>
+
+    <mxCell id="40" value="事件流入" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11" edge="1" parent="1" source="2" target="3">
       <mxGeometry relative="1" as="geometry" />
     </mxCell>
-    <mxCell id="31" value="events" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="3" target="7">
+    <mxCell id="41" value="events" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11;exitX=0.15;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="3" target="8">
       <mxGeometry relative="1" as="geometry" />
     </mxCell>
-    <mxCell id="32" value="events" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="3" target="11">
+    <mxCell id="42" value="events" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11;exitX=0.8;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="3" target="16">
       <mxGeometry relative="1" as="geometry" />
     </mxCell>
-    <mxCell id="33" value="context_for()" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.15;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="7" target="15">
+    <mxCell id="43" value="events" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11;exitX=0.32;exitY=1;exitDx=0;exitDy=0;entryX=0.8;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="3" target="20">
       <mxGeometry relative="1" as="geometry" />
     </mxCell>
-    <mxCell id="34" value="to_prompt_text() + 标签" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.85;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="11" target="15">
+    <mxCell id="44" value="context_for()" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.15;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="8" target="24">
       <mxGeometry relative="1" as="geometry" />
     </mxCell>
-    <mxCell id="35" value="Action(JSON)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11" edge="1" parent="1" source="15" target="20">
+    <mxCell id="45" value="to_prompt_text() → 【人际关系】" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.4;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="12" target="24">
       <mxGeometry relative="1" as="geometry" />
     </mxCell>
-    <mxCell id="36" value="执行效果" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11" edge="1" parent="1" source="20" target="23">
+    <mxCell id="46" value="to_prompt_text()+标签 → 【此刻内心】" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="16" target="24">
       <mxGeometry relative="1" as="geometry" />
     </mxCell>
-    <mxCell id="37" value="事件回流 · 感知新事件（闭环）" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;strokeColor=#666666;fontSize=11;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0" edge="1" parent="1" source="23" target="2">
+    <mxCell id="47" value="npc_action 回流" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;strokeColor=#888888;fontSize=11;exitX=0;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.8;entryDx=0;entryDy=0" edge="1" parent="1" source="20" target="3">
       <mxGeometry relative="1" as="geometry">
         <Array as="points">
-          <mxPoint x="1130" y="945" />
-          <mxPoint x="1130" y="60" />
+          <mxPoint x="30" y="640" />
+          <mxPoint x="30" y="330" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="48" value="snapshot(nearby+外观) → 【周围的人】" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#4477aa;fontSize=11;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0" edge="1" parent="1" source="3" target="24">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="1370" y="215" />
+          <mxPoint x="1370" y="680" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="49" value="Action(JSON)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11" edge="1" parent="1" source="24" target="29">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="50" value="执行效果" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11" edge="1" parent="1" source="29" target="32">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="51" value="事件回流 · 闭环" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;strokeColor=#666666;fontSize=11;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0" edge="1" parent="1" source="32" target="2">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="1420" y="985" />
+          <mxPoint x="1420" y="50" />
         </Array>
       </mxGeometry>
     </mxCell>

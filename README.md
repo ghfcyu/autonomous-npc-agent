@@ -121,8 +121,11 @@ autonomous-npc-agent/
 
 ![架构图](docs/architecture.png)
 
-- 事件经 EventBus 分发，**记忆层**（短期/长期/事件驱动直写）与**内状态层**（5 维参数 + 规则引擎 + 标签）并行消费
-- 决策层混合决策：状态机与内状态管**硬规则**，LLM 管**柔性表达**；轻量 NPC 走纯规则路径（零 LLM 调用）
+- 事件经 EventBus 分发，**记忆层**（短期/长期/事件驱动直写）、**内状态层**（5 维参数 + 规则引擎 + 标签）、**关系网络层**（好感值 → 【人际关系】注入）并行消费
+- **背景 NPC 层**独立于决策层：EventBus 订阅 → 规则反应 → npc_action 事件回流，全程零 LLM 调用
+- 决策层混合决策：状态机与内状态管**硬规则**，LLM 管**柔性表达**；上下文注入【此刻内心】【周围的人】(nearby+外观)【人际关系】三块
+- **外观链路**：set_appearance → appearance_change 事件 → NPC 感知 → snapshot nearby 携带外观 → 决策上下文
+- **村庄结构**：Location.category 三类（shop 店铺 / public 公共 / residence 居所），configs/locations.json 配置化加载
 - 行动层白名单校验后执行，新事件回流总线，形成**世界闭环**
 
 图表源文件 [docs/architecture.drawio](./docs/architecture.drawio) 可在 [app.diagrams.net](https://app.diagrams.net) 打开编辑。详见 [ARCHITECTURE.md](./ARCHITECTURE.md)。

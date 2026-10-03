@@ -26,6 +26,7 @@ class MockLLMProvider(BaseLLMProvider):
     name = "mock"
 
     def __init__(self, chaos_rate: float = 0.0, seed: int = 42) -> None:
+        super().__init__()
         self.chaos_rate = chaos_rate
         self._rng = random.Random(seed)
         self._seen: Dict[str, int] = {}  # npc_id -> 交互次数

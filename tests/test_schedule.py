@@ -149,7 +149,7 @@ class TestTokenBaselineAfterOperation(unittest.TestCase):
         self.engine = NPCEngine(llm=MockLLMProvider())
 
     def test_core_dialogue_token_in_baseline_range(self):
-        """全天运转后 4 次核心对话 token 在 4000-5500，调用次数为 4。
+        """全天运转后 4 次核心对话 token 在 4400-4800，调用次数为 4。
 
         流程：24 次 tick(60) 模拟一整天 → 时间回到 8:00、NPC 在工作地 WORKING
         → 4 次核心对话（2 chen + 2 lily，均命中 Mock 话题库）。
@@ -163,8 +163,8 @@ class TestTokenBaselineAfterOperation(unittest.TestCase):
         engine.player_says("有好铁矿石吗", "chen")
         engine.player_says("有新货吗", "lily")
         engine.player_says("有什么消息", "lily")
-        self.assertGreaterEqual(engine.llm.total_tokens_used, 4000)
-        self.assertLessEqual(engine.llm.total_tokens_used, 5500)
+        self.assertGreaterEqual(engine.llm.total_tokens_used, 4400)
+        self.assertLessEqual(engine.llm.total_tokens_used, 4800)
         self.assertEqual(engine.llm.call_count, 4)
 
     def test_background_zero_token_after_full_operation(self):

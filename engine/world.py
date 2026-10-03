@@ -124,10 +124,24 @@ class World:
     """游戏世界状态与感知入口。"""
 
     _DEFAULT_ENV_EVENTS = [
+        # --- 既有 4 条（保留不变，保证确定性轮播首项不变） ---
         {"actor": "chen", "summary": "铁匠陈想起该去收矿石了"},
         {"actor": "lily", "summary": "莉莉盘算着新货的报价"},
         {"actor": "chen", "summary": "铁匠陈觉得炉火该添炭了"},
         {"actor": "lily", "summary": "莉莉在整理货架上的商品"},
+        # --- 新增：背景 NPC 职业生活自发事件 ---
+        {"actor": "baker_liu", "summary": "刘婶在揉明早要用的面团"},
+        {"actor": "baker_liu", "summary": "刘婶往炉子里添了把柴，烤面包的香味飘了出来"},
+        {"actor": "tavern_sun", "summary": "孙老三在擦拭酒碗，准备迎接晚间客人"},
+        {"actor": "tavern_sun", "summary": "孙老三盘算着该进一批新米酒了"},
+        {"actor": "doc_qin", "summary": "秦大夫在药柜前翻找，核对草药库存"},
+        {"actor": "fisher_zhou", "summary": "周渔夫蹲在河边补渔网，盘算着明天的潮汛"},
+        {"actor": "fisher_zhou", "summary": "周渔夫把今早打到的鱼按大小分了分"},
+        {"actor": "weaver_yang", "summary": "杨大姐理着布匹，嘴里念叨着该染一批新棉布了"},
+        {"actor": "farmer_zhao", "summary": "赵老汉蹲在田埂上看了看天色，盘算着该浇水了"},
+        {"actor": "old_zhang", "summary": "老张坐在铺子门口，回忆着年轻时打铁的日子"},
+        {"actor": "guard_wang", "summary": "王守卫在村口来回踱步，查看有没有生面孔"},
+        {"actor": "guard_wang", "summary": "王守卫靠着墙打了个盹，又立刻警醒过来"},
     ]
 
     def __init__(self, locations: Optional[List[Location]] = None,

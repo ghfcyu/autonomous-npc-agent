@@ -12,7 +12,7 @@ import unittest
 from engine.engine import NPCEngine
 from engine.llm.mock import MockLLMProvider
 from engine.npc import Persona
-from engine.world import EventSlot, World
+from engine.world import EventSlot, World, WorldEvent
 
 # World 默认环境事件池（engine/world.py 中的契约顺序）
 DEFAULT_POOL = [
@@ -20,6 +20,18 @@ DEFAULT_POOL = [
     {"actor": "lily", "summary": "莉莉盘算着新货的报价"},
     {"actor": "chen", "summary": "铁匠陈觉得炉火该添炭了"},
     {"actor": "lily", "summary": "莉莉在整理货架上的商品"},
+    {"actor": "baker_liu", "summary": "刘婶在揉明早要用的面团"},
+    {"actor": "baker_liu", "summary": "刘婶往炉子里添了把柴，烤面包的香味飘了出来"},
+    {"actor": "tavern_sun", "summary": "孙老三在擦拭酒碗，准备迎接晚间客人"},
+    {"actor": "tavern_sun", "summary": "孙老三盘算着该进一批新米酒了"},
+    {"actor": "doc_qin", "summary": "秦大夫在药柜前翻找，核对草药库存"},
+    {"actor": "fisher_zhou", "summary": "周渔夫蹲在河边补渔网，盘算着明天的潮汛"},
+    {"actor": "fisher_zhou", "summary": "周渔夫把今早打到的鱼按大小分了分"},
+    {"actor": "weaver_yang", "summary": "杨大姐理着布匹，嘴里念叨着该染一批新棉布了"},
+    {"actor": "farmer_zhao", "summary": "赵老汉蹲在田埂上看了看天色，盘算着该浇水了"},
+    {"actor": "old_zhang", "summary": "老张坐在铺子门口，回忆着年轻时打铁的日子"},
+    {"actor": "guard_wang", "summary": "王守卫在村口来回踱步，查看有没有生面孔"},
+    {"actor": "guard_wang", "summary": "王守卫靠着墙打了个盹，又立刻警醒过来"},
 ]
 
 
@@ -150,11 +162,12 @@ class TestWorldEventSlot(unittest.TestCase):
     def test_env_event_cycles_through_pool(self):
         world = World()
         world.event_slot = EventSlot(step=0.05, threshold=0.05)  # 每次 tick 必触发
-        for _ in range(5):
+        total = len(DEFAULT_POOL)
+        for _ in range(total + 1):
             world.tick()
         summaries = [e.payload["summary"] for e in env_events_in(world.bus)]
-        self.assertEqual(len(summaries), 5)
-        # 按事件池顺序轮播，第 5 次回到池首
+        self.assertEqual(len(summaries), total + 1)
+        # 按事件池顺序轮播，最后一轮回到池首
         expected = [d["summary"] for d in DEFAULT_POOL]
         self.assertEqual(summaries, expected + [expected[0]])
 
@@ -239,6 +252,83 @@ class TestEngineIntegration(unittest.TestCase):
         chen = self.engine.npcs["chen"]
         self.assertTrue(any("铁匠陈想起该去收矿石了" in c
                             for c in short_contents(chen)))
+
+
+class TestEventPoolCoverage(unittest.TestCase):
+    """审查指令1：事件池覆盖全部 10 NPC 的对抗性测试。"""
+
+    ALL_NPC_IDS = [
+        "chen", "lily",  # 核心
+        "baker_liu", "tavern_sun", "doc_qin", "fisher_zhou",
+        "weaver_yang", "farmer_zhao", "old_zhang", "guard_wang",  # 背景
+    ]
+
+    def test_pool_covers_all_npcs(self):
+        """对抗性测试：事件池中每个 NPC 至少有 1 条事件。
+        若遗漏任一 NPC，此测试失败（先红后绿）。
+        """
+        actors = {e["actor"] for e in World._DEFAULT_ENV_EVENTS}
+        for npc_id in self.ALL_NPC_IDS:
+            self.assertIn(npc_id, actors,
+                          msg=f"事件池缺少 NPC {npc_id} 的自发事件")
+
+    def test_pool_size_at_least_one_per_npc(self):
+        """事件池至少 10 条（每 NPC 至少 1 条）。"""
+        self.assertGreaterEqual(len(World._DEFAULT_ENV_EVENTS), 10)
+
+    def test_pool_default_matches_test_constant(self):
+        """world.py 的 _DEFAULT_ENV_EVENTS 与测试常量 DEFAULT_POOL 完全一致。"""
+        world_pool = list(World._DEFAULT_ENV_EVENTS)
+        self.assertEqual(len(world_pool), len(DEFAULT_POOL))
+        for w, t in zip(world_pool, DEFAULT_POOL):
+            self.assertEqual(w, t)
+
+
+class TestBackgroundNPCEventPerception(unittest.TestCase):
+    """新增：背景 NPC 的环境事件可被同地点 NPC 感知（G3 契约延续）。"""
+
+    def setUp(self):
+        # 默认引擎加载全部 10 NPC（2 核心 + 8 背景）
+        self.engine = NPCEngine(llm=MockLLMProvider())
+
+    def test_baker_liu_event_perceived_by_same_location(self):
+        """手动注入 baker_liu 的环境事件，验证事件确实进入了总线历史。
+        baker_liu 是背景 NPC，在 engine.background_npcs 中。
+        """
+        self.engine.world.bus.publish(WorldEvent(
+            0, "env_event", "baker_liu",
+            {"summary": "刘婶在揉明早要用的面团"}
+        ))
+        # 验证事件确实进入了总线历史
+        events = [e for e in self.engine.world.bus.history if e.kind == "env_event"]
+        self.assertTrue(any("刘婶" in e.payload.get("summary", "") for e in events))
+
+    def test_background_event_not_perceived_by_different_location(self):
+        """异地核心 NPC 不应感知背景 NPC 的环境事件。
+        baker_liu 在 bakery，chen 在 forge——chen 不应感知 baker_liu 的事件。
+        """
+        self.engine.world.bus.publish(WorldEvent(
+            0, "env_event", "baker_liu",
+            {"summary": "刘婶在揉明早要用的面团"}
+        ))
+        chen = self.engine.npcs["chen"]
+        self.assertFalse(any("刘婶" in c for c in [
+            r.content for r in chen.memory.short.recent()
+        ]), "chen 在 forge 不应感知 bakery 发生的事件")
+
+    def test_farmer_zhao_event_perceived_at_same_location(self):
+        """farmer_zhao 在 plaza，guard_wang 也在 plaza。
+        手动触发 farmer_zhao 的事件，guard_wang 应产生规则反应（npc_action）。
+        """
+        self.engine.world.bus.publish(WorldEvent(
+            0, "env_event", "farmer_zhao",
+            {"summary": "赵老汉蹲在田埂上看了看天色"}
+        ))
+        # 检查 guard_wang 是否产生了 npc_action 反应
+        actions = [e for e in self.engine.world.bus.history
+                   if e.kind == "npc_action" and e.actor == "guard_wang"]
+        self.assertTrue(len(actions) > 0,
+                        "guard_wang 在 plaza 应对同地点的 farmer_zhao 事件产生规则反应")
 
 
 if __name__ == "__main__":

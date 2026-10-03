@@ -18,8 +18,10 @@ class BaseLLMProvider(ABC):
     """所有 Provider 的基类。"""
 
     name: str = "base"
-    last_usage: Dict[str, int] = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
-    total_tokens_used: int = 0
+
+    def __init__(self) -> None:
+        self.last_usage: Dict[str, int] = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        self.total_tokens_used: int = 0
 
     @abstractmethod
     def chat(self, messages: List[Dict[str, str]], temperature: float = 0.7) -> str:

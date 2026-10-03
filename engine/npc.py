@@ -146,6 +146,14 @@ class NPC:
         state = self.persona.schedule_state(hour)
         if state is not None and state is not self.state_machine.state:
             self.state_machine.force(state)  # 作息表是外部调度，允许强制
+            # G6-B: 作息驱动位置移动
+            if state == NPCState.SLEEPING and self.persona.residence:
+                if self.entity.location_id != self.persona.residence:
+                    self.world.move_entity(self.persona.id, self.persona.residence)
+            elif state == NPCState.WORKING:
+                if self.entity.location_id != self.persona.location_id:
+                    self.world.move_entity(self.persona.id, self.persona.location_id)
+            # IDLE: 保持当前位置不动
         return state
 
     def to_dict(self) -> Dict[str, Any]:

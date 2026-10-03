@@ -169,6 +169,11 @@ class NPCEngine:
             state = npc.apply_schedule(self.world.hour)
             if state is not None:
                 applied[npc_id] = state.value
+        # G6-B: 背景 NPC 同样应用作息驱动
+        for bg_id, bg in self.background_npcs.items():
+            state = bg.apply_schedule(self.world.hour)
+            if state is not None:
+                applied[bg_id] = state
         return {"clock": self.world.clock, "tick": self.world.tick_count,
                 "schedule_applied": applied}
 

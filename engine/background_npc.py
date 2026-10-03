@@ -23,6 +23,8 @@ class BackgroundNPC:
         self._schedule: Dict[str, str] = config.get("schedule", {})
         self._world = world
         self._reaction_counter: Dict[str, int] = {}
+        self._workplace = config["location_id"]   # 工作地（初始位置），存储后不变
+        self._current_state: Optional[str] = None  # 当前作息状态，初始无
 
         # 注册实体到世界
         self._entity = Entity(
@@ -61,8 +63,33 @@ class BackgroundNPC:
 
     @property
     def schedule(self) -> Dict[str, str]:
-        """作息表（G6-A：本次先存储，后续阶段再应用）。"""
+        """作息表（G6-B：作息表，apply_schedule 驱动位置移动）。"""
         return self._schedule
+
+    def apply_schedule(self, hour: int) -> Optional[str]:
+        """作息驱动：按 tick 时间在居所/工作地间移动。
+
+        返回该小时的作息状态字符串（如 "WORKING"），无匹配返回 None。
+        仅当状态实际变化时才移动实体并发布 entity_moved 事件。
+        - WORKING → 移动到工作地（_workplace）
+        - SLEEPING → 移动到居所（_residence）
+        - IDLE → 保持当前位置不动
+        """
+        state_str = self._schedule.get(str(hour))
+        if state_str is None:
+            return None
+        if state_str == self._current_state:
+            return state_str
+        # 状态变化，执行移动
+        self._current_state = state_str
+        if state_str == "SLEEPING" and self._residence:
+            if self._entity.location_id != self._residence:
+                self._world.move_entity(self._id, self._residence)
+        elif state_str == "WORKING":
+            if self._entity.location_id != self._workplace:
+                self._world.move_entity(self._id, self._workplace)
+        # IDLE: 保持当前位置不动
+        return state_str
 
     def _on_event(self, event: WorldEvent) -> None:
         """规则反应：按事件类型+位置过滤，确定性选择模板，发布 npc_action。"""
@@ -109,5 +136,7 @@ class BackgroundNPC:
             "location_id": self._entity.location_id,
             "summary": self._summary,
             "residence": self._residence,
+            "schedule": self._schedule,
+            "current_state": self._current_state,
             "type": "background",
         }

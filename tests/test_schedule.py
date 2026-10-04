@@ -153,7 +153,7 @@ class TestTokenBaselineAfterOperation(unittest.TestCase):
 
         流程：24 次 tick(60) 模拟一整天 → 时间回到 8:00、NPC 在工作地 WORKING
         → 4 次核心对话（2 chen + 2 lily，均命中 Mock 话题库）。
-        基线约 4435，运转产生的少量移动记忆仅轻微影响 recent(6) 上下文。
+        基线约 4435，运转产生的少量移动记忆仅轻微影响 recent(4) 上下文（上下文裁剪）。
         """
         engine = self.engine
         for _ in range(24):

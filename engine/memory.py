@@ -23,6 +23,8 @@ from .world import WorldEvent
 
 SHORT_TERM_CAPACITY = 30
 CONSOLIDATE_BATCH = 8
+# 决策上下文注入的近期记忆条目数（上下文裁剪：6→4，削减 prompt token）
+RECENT_CONTEXT_WINDOW = 4
 # 重要度达到该阈值的事件，在写入短期记忆的同时直接沉淀为长期记忆
 # （如 item_given，importance=0.8），无需等待短期溢出后的 consolidate 压缩。
 LONG_TERM_IMPORTANCE_THRESHOLD = 0.7
@@ -195,5 +197,5 @@ class MemorySystem:
         related = self.long.retrieve(query, top_k=3)
         return {
             "long_term": [r.content for r in related],
-            "recent": [r.content for r in self.short.recent(6)],
+            "recent": [r.content for r in self.short.recent(RECENT_CONTEXT_WINDOW)],
         }

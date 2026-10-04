@@ -31,7 +31,7 @@ AIGC:
 - **关系网络**：NPC 之间结构化存储社会关系（父子/熟人/宿敌，好感/敌意值），关系数据注入核心 NPC 决策上下文——提到其父时语气变化、提及熟人时态度不同
 - **外观与环境状态**：实体拥有可变外观（穿着/姿势），换装作为 `appearance_change` 事件发布，同地点 NPC 感知写入记忆、异地无感知；决策上下文注入【周围的人】块——NPC 对话能"看见"并引用对方穿着（"你今天穿着围裙"）
 - **小村庄世界**：地点按"店铺/公共空间/居所"三类组织为可探索结构（`configs/locations.json` 配置化，内置默认 17 地点），NPC 扩至 10 个且全部配置化（各有居所/作息/职业/社会关系），作息表驱动 NPC 在居所与工作地间按时间移动（核心+背景 NPC 均参与）；新增以背景 NPC 为主（零 LLM），核心 NPC 仍跑完整决策链——村庄有人气但不增 token 成本
-- **Token 经济性度量与主动削减**：LLM Provider 上报每次调用的 token 用量（`last_usage`：prompt/completion/total_tokens），`NPCEngine` 按 NPC 聚合统计（`token_stats`），`status()` 暴露 token 报告字段——背景 NPC 零 LLM 以 token 数（非调用次数）可断言、可度量、可对比趋势；**上下文裁剪**：决策上下文注入的近期记忆从 6 条裁剪至 4 条（`RECENT_CONTEXT_WINDOW=4`），直接削减 prompt token，token 趋势呈下降（4435→4660→4553）
+- **Token 经济性度量与主动削减**：LLM Provider 上报每次调用的 token 用量（`last_usage`：prompt/completion/total_tokens），`NPCEngine` 按 NPC 聚合统计（`token_stats`），`status()` 暴露 token 报告字段——背景 NPC 零 LLM 以 token 数（非调用次数）可断言、可度量、可对比趋势；**上下文裁剪**：决策上下文注入的近期记忆从 6 条裁剪至 4 条（`RECENT_CONTEXT_WINDOW=4`），直接削减 prompt token，token 趋势呈下降（4435→4660→4553，seed=42 确定性可复现）
 - **可靠性护栏**：动作白名单 + 状态机校验 + 内状态硬约束，LLM 输出经过验证器过滤，异常时安全回退
 - **零依赖内核**：engine 核心仅使用 Python 标准库；FastAPI 服务为可选层
 - **可视化 Demo**：自带 2D 俯视小地图 + 聊天界面的 Web 演示端
@@ -136,7 +136,7 @@ autonomous-npc-agent/
 python3 -m unittest discover -s tests -v
 ```
 
-覆盖：记忆读写与巩固、事件驱动长期写入、玩家送礼闭环、事件总线、状态机迁移约束、动作白名单校验、LLM 异常输出回退、引擎端到端闭环、量化内状态参数变化、标签行为影响、内状态硬约束（压力/精力阈值拒绝）、能量随时间消耗与恢复、随机事件槽累积与触发、环境事件 NPC 感知与确定性测试、背景 NPC 规则反应与零 LLM 调用断言、关系网络 CRUD 与决策上下文注入、外观状态更新与事件发布契约、NPC 感知位置过滤（同地可见/异地不可见）、对话上下文的外观引用与 token 经济性（空 nearby 不注入）、村庄规模与运转（NPC≥10/地点≥15 三类齐全/全员居所注册/背景 NPC 零 LLM/全村庄 tick 推进/status 全村庄覆盖）、作息驱动位置移动（SLEEPING 移居所/WORKING 移工作地/IDLE 保持原位/核心+背景 NPC 均参与/全天运转后 token 基线对比）、Token 度量基线（Mock 字符数估算/OpenAI usage 解析/背景 NPC 零 token 断言/status token_stats 字段）、Mock 话题匹配范围修复（仅扫描【玩家说】段，地点名与外观文本不误触发）、环境事件池覆盖全部 10 NPC（18 条自发事件 + 对抗性池-常量锁 + 背景NPC事件感知回流）、上下文裁剪对抗性测试（RECENT_CONTEXT_WINDOW=4 常量锁 + 最多4条断言 + 最新4条顺序验证）。
+覆盖：记忆读写与巩固、事件驱动长期写入、玩家送礼闭环、事件总线、状态机迁移约束、动作白名单校验、LLM 异常输出回退、引擎端到端闭环、量化内状态参数变化、标签行为影响、内状态硬约束（压力/精力阈值拒绝）、能量随时间消耗与恢复、随机事件槽累积与触发、环境事件 NPC 感知与确定性测试、背景 NPC 规则反应与零 LLM 调用断言、关系网络 CRUD 与决策上下文注入、外观状态更新与事件发布契约、NPC 感知位置过滤（同地可见/异地不可见）、对话上下文的外观引用与 token 经济性（空 nearby 不注入）、村庄规模与运转（NPC≥10/地点≥15 三类齐全/全员居所注册/背景 NPC 零 LLM/全村庄 tick 推进/status 全村庄覆盖）、作息驱动位置移动（SLEEPING 移居所/WORKING 移工作地/IDLE 保持原位/核心+背景 NPC 均参与/全天运转后 token 基线对比）、Token 度量基线（Mock 字符数估算/OpenAI usage 解析/背景 NPC 零 token 断言/status token_stats 字段）、Mock 话题匹配范围修复（仅扫描【玩家说】段，地点名与外观文本不误触发）、环境事件池覆盖全部 10 NPC（16 条自发事件 + 对抗性池-常量锁 + 背景NPC事件感知回流）、上下文裁剪对抗性测试（RECENT_CONTEXT_WINDOW=4 常量锁 + 最多4条断言 + 最新4条顺序验证）、Token 基线确定性测试（random.seed(42) 固定天气随机 + 多次运行结果一致 + PINNED_TOTAL_TOKENS=4553 口径锁）。
 
 ## 路线图
 

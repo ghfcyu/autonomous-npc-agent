@@ -13,11 +13,17 @@
 
 用法：
     python3 scripts/token_baseline.py
+
+确定性：
+    main() 首行 random.seed(42) 固定天气随机（world.py 天气变化走
+    random.random()），24 次 tick 的天气事件序列可复现，
+    token 总消耗恒定（4553），不随运行波动。
 """
 
 from __future__ import annotations
 
 import os
+import random
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -37,6 +43,11 @@ CORE_DIALOGUES = [
 
 
 def main() -> int:
+    # 固定随机种子：world.py 天气变化用 random.random() 触发，
+    # 24 次 tick 中随机天气事件写入 NPC 记忆会影响 context_for 输出，
+    # 导致 token 数字每次运行波动（4545-4557）。固定 seed=42 后
+    # 输出确定性可复现，token 总消耗恒为 4553。
+    random.seed(42)
     # 1) 默认引擎：MockLLMProvider + 全部 10 NPC（2 核心 + 8 背景）
     engine = NPCEngine(llm=MockLLMProvider())
     core_ids = sorted(n for n in engine.npcs if n in CORE_NPCS)

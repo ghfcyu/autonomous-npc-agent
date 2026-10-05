@@ -58,20 +58,22 @@ WorldEvent（事件总线发布）
 规则引擎（按事件 kind + 标签 加成 计算确定性增量）
         │
         ▼
-InnerState（arousal/mood/energy/stress/trust，值域 [0,1]）
+InnerState（8D 正交基底：p_fatigue/p_hunger/p_pain/p_drive + e_P/e_A/e_D + S_stress，值域 [0,1]）
         │
         ├─→ to_prompt_text() → 注入决策上下文【此刻内心】
-        └─→ decide() 硬约束检查（stress>0.8 拒绝 / energy<0.15 收摊）
+        └─→ decide() 硬约束检查（S_stress>0.8 拒绝 / p_fatigue>0.85 收摊）
 ```
 
-- **InnerState**：5 维心理参数向量（兴奋度/心情/精力/压力/信任），`apply_delta` 自动 clamp 到 [0,1]
-- **StateUpdater**：作为 EventBus 的第二个 catch-all 订阅者（第一个是 NPC._on_event 写记忆），按确定性规则更新参数：
-  - `item_given` → trust+0.1, mood+0.05, stress-0.05（守财标签额外加成 trust）
-  - `player_spoke` → arousal+0.05, stress+0.05（较为自负标签对赞美/批评放大效应）
-  - `npc_action` → energy-0.02, arousal-0.01
-  - `time_passed` → SLEEPING 时 energy+0.05/stress-0.02；否则 energy-0.01
+- **InnerState**：8D 正交心智基底（唯一心智变量系统，无双轨）——4D 生理稳态（疲劳/饥饿/痛感/驱力）+ 3D PAD 心境（愉悦/唤醒/支配）+ 1D 压力负荷，`apply_delta` 自动 clamp 到 [0,1]
+- **荀子六情映射器**：`XUNZI_EMOTION_VECTORS`（好/恶/喜/怒/哀/乐 → PAD 增量矢量），是"情→心境"的确定性通道，替代逐参数硬编码
+- **亲缘度迁移**：trust 不在心智基底中，送礼改写 `RelationshipNetwork.update_affinity`（NPC↔player 亲缘度），NPC 初始化自动注入 player 边（客人/0.5）
+- **StateUpdater**：作为 EventBus 的第二个 catch-all 订阅者（第一个是 NPC._on_event 写记忆），按确定性规则更新基底：
+  - `item_given` → 六情"好"矢量（e_P+0.05/e_A+0.03/e_D+0.02）+ S_stress-0.05 + 亲缘度+0.1（守财标签额外加成亲缘度）
+  - `player_spoke` → 基础 e_A+0.05/S_stress+0.05；赞美→六情"喜"、批评→六情"怒"（较为自负标签放大 e_A/e_P）
+  - `npc_action` → p_fatigue+0.02, e_A-0.01
+  - `time_passed` → SLEEPING 时 p_fatigue-0.05/S_stress-0.02；否则 p_fatigue+0.01/p_hunger+0.01
 - **标签系统**：Persona.tags（Dict[str, float]），如 {"较为自负": 0.7}。标签在 StateUpdater 中可推断地影响参数增量幅度，并在 system prompt 中注入供 LLM 柔性调整说话风格
-- **硬约束**：decide() 在 LLM 调用前检查 stress/energy 阈值——压力过高自动 REFUSE（不接单），精力过低自动 REFUSE（提前收摊），与 SLEEPING 硬规则同级
+- **硬约束**：decide() 在 LLM 调用前检查 S_stress/p_fatigue 阈值——压力负荷过高自动 REFUSE（不接单），疲劳过高自动 REFUSE（提前收摊），与 SLEEPING 硬规则同级
 
 ### 2.7 关系网络层（`engine/relationships.py`）
 
@@ -117,13 +119,13 @@ WorldEvent（事件总线发布）
 | 组件 | 职责 | 为什么 |
 |---|---|---|
 | `StateMachine` | 状态迁移硬约束（IDLE/WORKING/TALKING/SLEEPING） | 确定性、可测试、防 LLM 越权 |
-| `InnerState` | 内状态硬约束（stress>0.8 拒绝、energy<0.15 收摊） | 心理参数驱动行为边界 |
+| `InnerState` | 内状态硬约束（S_stress>0.8 拒绝、p_fatigue>0.85 收摊） | 8D 心智基底驱动行为边界 |
 | `DecisionEngine` | 组装上下文（含内状态）→ 调 LLM → 解析动作 | 柔性、个性化、自然语言 |
 
 决策流程：
 
 1. 硬规则前置：当前状态是否允许对话？（SLEEPING → 直接产出"睡梦中嘟囔"的回退动作）
-2. 内状态硬约束：压力 > 0.8 → 拒绝接单；精力 < 0.15 → 提前收摊
+2. 内状态硬约束：压力负荷 S_stress > 0.8 → 拒绝接单；疲劳 p_fatigue > 0.85 → 提前收摊
 3. 上下文组装：人格卡 + 性格标签 + **人际关系** + 相关长期记忆 + 短期记忆（**`RECENT_CONTEXT_WINDOW=4`** 上下文裁剪，削减 prompt token）+ 世界快照（含**【周围的人】**同地点实体及外观，G5）+ **此刻内心状态** + 玩家输入 + 输出 JSON 契约
 4. LLM 生成结构化动作
 5. 校验失败/解析异常 → 人格自带的 `fallback_bank` 安全回退
@@ -153,14 +155,14 @@ WorldEvent（事件总线发布）
   → NPCEngine.player_says()
   → World 发布 player_spoke 事件
       → NPC._on_event 写入短期记忆
-      → StateUpdater.on_event 更新内状态（arousal+0.05, stress+0.05）
+      → StateUpdater.on_event 更新内状态（e_A+0.05, S_stress+0.05）
   → NPC.handle_player_input()
       → StateMachine 检查：WORKING 状态允许 TALKING ✓
-      → InnerState 硬约束检查：stress ≤ 0.8 且 energy ≥ 0.15 ✓
+      → InnerState 硬约束检查：S_stress ≤ 0.8 且 p_fatigue ≤ 0.85 ✓
       → MemorySystem.context_for("打剑") 检索相关长期记忆
       → DecisionEngine：组装 prompt（含【此刻内心】状态行）→ LLM → {"action":"speak","text":"..."}
       → ActionValidator：白名单 + 一致性校验 ✓
-  → ActionExecutor 执行 → 世界事件 npc_action → StateUpdater 更新内状态（energy-0.02）
+  → ActionExecutor 执行 → 世界事件 npc_action → StateUpdater 更新内状态（p_fatigue+0.02）
   → 记忆层沉淀本次交互 → 短期记忆超限则触发巩固
   → 事件槽累积 +5%（G3：player_says 末尾调用 accumulate_event_slot）
 ```
@@ -240,17 +242,17 @@ NPCEngine.tick(minutes)
 
 ## v2 世界模型蓝图（docs/ 三规范裁定后的目标架构）
 
-> 依据 `docs/01_WORLD_SPECIFICATION_WHAT.md`、`02_ENGINEERING_IMPLEMENTATION_HOW.md`、`NPC_TAG_DATABASE.md` 三份规范，经共线性去重/平庸泥潭破解/纸面哲学砍除后裁定的目标架构。**T1-T6 阶段逐步落地，落地前此章为目标态。**
+> 依据 `docs/01_WORLD_SPECIFICATION_WHAT.md`、`02_ENGINEERING_IMPLEMENTATION_HOW.md`、`NPC_TAG_DATABASE.md` 三份规范，经共线性去重/平庸泥潭破解/纸面哲学砍除后裁定的目标架构。**T1-T6 阶段逐步落地；T1 已于 2026-10-06 落地（8D 基底+荀子六情映射器+trust 迁移关系网），其余为目标态。**
 
-### 心智层 v2：8D 正交基底（T1）
+### 心智层 v2：8D 正交基底（T1，✅ 2026-10-06 落地）
 
 ```
 Ψ(t) = [ p_fatigue, p_hunger, p_pain, p_drive |  e_P, e_A, e_D |  S_stress ]
          └── 生理稳态 4D [0,1] ──┘  └─ PAD 心境 3D [-1,1] ─┘  └ 压力 1D ┘
 ```
 
-- 事件 → 心智的通路：**荀子六情映射器**（好/恶/喜/怒/哀/乐 → PAD 增量矢量，如"怒"→[-0.3,+0.6,+0.5]）挂在 StateUpdater，替代逐参数硬编码
-- trust 不是心智而是关系 → 迁入 RelationshipNetwork（主观亲缘度分量）
+- 事件 → 心智的通路：**荀子六情映射器**（`XUNZI_EMOTION_VECTORS`：好/恶/喜/怒/哀/乐 → PAD 增量矢量，如"怒"→[-0.08,+0.10,-0.05]）挂在 StateUpdater `_apply_xunzi`，替代逐参数硬编码 ✅
+- trust 不是心智而是关系 → 迁入 RelationshipNetwork（`update_affinity` 主观亲缘度分量，NPC 初始化注入 player 边）✅
 
 ### 标签层 v2：大一统标签数据库（T2）
 

@@ -38,6 +38,12 @@ class RelationshipNetwork:
                 return r
         return None
 
+    def update_affinity(self, source_id: str, target_id: str, delta: float) -> None:
+        """更新 source→target 的亲缘度，clamp 到 [-1.0, 1.0]。关系不存在则忽略。"""
+        rel = self.get_relation_to(source_id, target_id)
+        if rel is not None:
+            rel.affinity = max(-1.0, min(1.0, rel.affinity + delta))
+
     def to_prompt_text(self, source_id: str) -> str:
         """生成注入 LLM 决策上下文的关系描述文本。无关系时返回空字符串。
 

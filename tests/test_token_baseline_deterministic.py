@@ -2,15 +2,19 @@
 
 背景（2026-10-05 数字纠正）：
     engine/world.py:229 天气变化走 random.random()，24 次 tick 中随机
-    天气事件写入 NPC 记忆 → context_for 输出变化 → prompt token 波动
-    （实测 4545-4557：审查者测 4552、日志写 4553、每次实跑都不同）。
+    天气事件写入 NPC 记忆 → context_for 输出变化 → prompt token 波动。
     scripts/token_baseline.py main() 首行 random.seed(42) 固定天气序列后，
-    token 总消耗恒为 4553，口径唯一。
+    token 总消耗可确定性复现，口径唯一。
+
+口径变更史（T1 8D 心智基底迁移，2026-10-06）：
+    - 旧口径 4553：5D 内状态（5 参数【此刻内心】）+ 关系网无玩家边；
+    - 新口径 4737：8D 基底（8 参数【此刻内心】）+ 系统 prompt
+      注入玩家亲缘度边（NPC 初始化自动建 chen→player / lily→player）。
+    两次完整场景实测严格相等，仍在审查硬标准 4400-4800 内。
 
 对抗性设计（先红后绿）：
-    红：修复前 main() 无 seed → 两次完整场景 total_tokens 概率性不等，
-        且几乎不可能恰好等于 4553 → 本测试失败；
-    绿：修复后 seed=42 → 两次 total_tokens 严格相等且恒为 4553 → 通过。
+    红：seed 未固定 → 两次完整场景 total_tokens 概率性不等；
+    绿：seed=42 → 两次 total_tokens 严格相等且恒为 4737 → 通过。
 
 测试路径与命令行复跑完全一致：直接调用 scripts/token_baseline.py 的
 main()（24 tick + 4 对话的完整场景），不做任何桩替换，保证测的就是
@@ -28,10 +32,10 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _BASELINE_SCRIPT_PATH = os.path.join(_PROJECT_ROOT, "scripts",
                                      "token_baseline.py")
 
-# seed=42 固定后的基线值（跨 3 次独立进程实测恒定，与日志口径 4553 一致）。
+# seed=42 固定后的基线值（T1 8D 心智基底迁移后实测，两次运行严格相等）。
 # 若未来迭代合法改变 token 基线，须有意识更新此值并同步 README/PROGRESS，
 # 不允许数字未经代码验证进入文档（2026-10-04 审查批评项）。
-PINNED_TOTAL_TOKENS = 4553
+PINNED_TOTAL_TOKENS = 4737
 # 审查硬标准区间
 HARD_RANGE = (4400, 4800)
 
@@ -81,8 +85,8 @@ class TestTokenBaselineDeterministic(unittest.TestCase):
             total_first, total_second,
             f"两次完整场景 token 总消耗不一致：{total_first} vs "
             f"{total_second}——随机性未被 seed 固定，基线不可复现")
-        # 数字固化：seed=42 基线恒为 4553（审查 4552 / 日志 4553 /
-        # 波动 4545-4557 的口径统一）。此断言即"数字经代码验证"的流程固化。
+        # 数字固化：seed=42 基线恒为 4737（T1 8D 迁移后实测口径）。
+        # 此断言即"数字经代码验证"的流程固化。
         self.assertEqual(
             total_first, PINNED_TOTAL_TOKENS,
             f"token 基线应为 {PINNED_TOTAL_TOKENS}，实际 {total_first}——"

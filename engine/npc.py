@@ -12,7 +12,7 @@ from .inner_state import InnerState, StateUpdater
 from .decision import DecisionEngine
 from .llm.base import BaseLLMProvider
 from .memory import MemorySystem
-from .relationships import RelationshipNetwork
+from .relationships import Relationship, RelationshipNetwork
 from .states import NPCState, StateMachine
 from .world import World, WorldEvent
 
@@ -90,7 +90,14 @@ class NPC:
         self.world = world
         self.memory = MemorySystem(persona.id, store_dir=store_dir)
         self.state_machine = StateMachine(NPCState.WORKING)
-        self.decision = DecisionEngine(persona, llm, relationships=relationships)
+        # 关系网络：亲缘度归关系网维护（不在 8D 心智基底中）
+        self.relationships = relationships or RelationshipNetwork()
+        # 玩家边缺省注入：NPC 默认认识玩家（客人，好感 0.5）
+        if self.relationships.get_relation_to(persona.id, "player") is None:
+            self.relationships.add(Relationship(
+                source_id=persona.id, target_id="player",
+                relation="客人", affinity=0.5))
+        self.decision = DecisionEngine(persona, llm, relationships=self.relationships)
         self.executor = ActionExecutor(world)
 
         # 注册到世界

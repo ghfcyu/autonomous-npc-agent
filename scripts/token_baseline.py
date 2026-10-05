@@ -17,7 +17,7 @@
 确定性：
     main() 首行 random.seed(42) 固定天气随机（world.py 天气变化走
     random.random()），24 次 tick 的天气事件序列可复现，
-    token 总消耗恒定（4553），不随运行波动。
+    token 总消耗恒定（4737，T1 8D 心智基底迁移后口径），不随运行波动。
 """
 
 from __future__ import annotations
@@ -45,8 +45,10 @@ CORE_DIALOGUES = [
 def main() -> int:
     # 固定随机种子：world.py 天气变化用 random.random() 触发，
     # 24 次 tick 中随机天气事件写入 NPC 记忆会影响 context_for 输出，
-    # 导致 token 数字每次运行波动（4545-4557）。固定 seed=42 后
-    # 输出确定性可复现，token 总消耗恒为 4553。
+    # 导致 token 数字每次运行波动。固定 seed=42 后输出确定性可复现。
+    # T1 8D 心智基底迁移后口径：【此刻内心】5 参数→8 参数 + 系统 prompt
+    # 注入玩家亲缘度边，token 总消耗旧基线 4553 → 新基线 4737
+    # （两次完整场景实测严格相等，仍在审查硬标准 4400-4800 内）。
     random.seed(42)
     # 1) 默认引擎：MockLLMProvider + 全部 10 NPC（2 核心 + 8 背景）
     engine = NPCEngine(llm=MockLLMProvider())

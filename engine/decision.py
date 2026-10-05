@@ -112,12 +112,12 @@ class DecisionEngine:
         if sm.blocks_speech():
             return Action(ActionType.SPEAK, {"text": self.persona.sleep_mumble})
 
-        # 1.5) 硬规则：内状态硬约束（压力过高拒绝接单，精力过低提前收摊）
+        # 1.5) 硬规则：内状态硬约束（压力负荷过高拒绝接单，疲劳过高提前收摊）
         istate = npc.inner_state
-        if istate.stress > 0.8:
+        if istate.S_stress > 0.8:
             return Action(ActionType.REFUSE, {"reason": "stress_too_high"})
-        if istate.energy < 0.15:
-            return Action(ActionType.REFUSE, {"reason": "energy_too_low"})
+        if istate.p_fatigue > 0.85:
+            return Action(ActionType.REFUSE, {"reason": "fatigue_too_high"})
 
         memory_ctx = npc.memory.context_for(player_input)
         snapshot = world.snapshot(npc.persona.id)

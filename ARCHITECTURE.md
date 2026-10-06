@@ -120,6 +120,7 @@ WorldEvent（事件总线发布）
 |---|---|---|
 | `StateMachine` | 状态迁移硬约束（IDLE/WORKING/TALKING/SLEEPING） | 确定性、可测试、防 LLM 越权 |
 | `InnerState` | 内状态硬约束（S_stress>0.8 拒绝、p_fatigue>0.85 收摊） | 8D 心智基底驱动行为边界 |
+| `FillerEngine`（`engine/filler.py`） | 慢脑 LLM 调用前同步生成反应性垫话占位：脾气掩码 × 8D 当下状态双驱动（S_stress>0.6 带烦躁语气、e_P>0.7 带愉悦语气），每模板 ≤15 token | 玩家等待 LLM 期间即感知到"NPC 的第一反应"（0-token 本地计算，不进 LLM prompt） |
 | `DecisionEngine` | 组装上下文（含内状态）→ 调 LLM → 解析动作 | 柔性、个性化、自然语言 |
 
 决策流程：
@@ -144,7 +145,7 @@ WorldEvent（事件总线发布）
 
 ### 6. 编排层（`engine/engine.py` + `engine/npc.py`）
 
-- `Persona`：JSON 配置 → 人格对象（性格、背景、语气、对话库、作息表、**标签**、**外观**、**居所**）
+- `Persona`：JSON 配置 → 人格对象（性格、背景、语气、对话库、作息表、**标签**、**外观**、**居所**、**脾气掩码 temperament**——垫话引擎的掩码标识，T2 落地 8 掩码后由标签库生成）
 - `NPC`：人格 + 记忆系统 + 状态机 + 决策引擎 + **内状态** 的聚合根，订阅事件总线（记忆写入 + 状态更新双订阅）
 - `NPCEngine`：世界 + NPC 集合的编排入口，暴露 `player_says / player_gives / player_changes_appearance / tick / status` 五个核心 API（`player_gives`：玩家送礼，库存转移或宽松发布事件，NPC 经事件链路记入短期+长期记忆；`player_changes_appearance`：玩家换装，同地点 NPC 感知；`tick`：推进世界时间并对核心+背景 NPC 应用作息驱动位置移动）。全默认构造时自动扫描 `configs/`（npcs + background_npcs + relationships + locations），加载小村庄：2 核心 NPC（chen/lily 跑完整决策链）+ 8 背景 NPC（零 LLM 规则反应）+ 17 地点（三类可探索）。`player_says` 后按 NPC 聚合 token 统计（`token_stats`），`status()` 返回 `token_stats` 字段（`by_npc` 按 NPC 聚合 prompt/completion/total/calls，`total_tokens` 为 LLM 累计，`llm_calls` 为调用次数）
 
@@ -156,6 +157,7 @@ WorldEvent（事件总线发布）
   → World 发布 player_spoke 事件
       → NPC._on_event 写入短期记忆
       → StateUpdater.on_event 更新内状态（e_A+0.05, S_stress+0.05）
+  → FillerEngine.generate(反应性 8D 状态) → 垫话占位（慢脑前同步返回，0-token）
   → NPC.handle_player_input()
       → StateMachine 检查：WORKING 状态允许 TALKING ✓
       → InnerState 硬约束检查：S_stress ≤ 0.8 且 p_fatigue ≤ 0.85 ✓
@@ -271,7 +273,8 @@ NPCEngine.tick(minutes)
               └─ 未命中 ──▶ 脾气掩码垫话（0ms 动作抢跑 + 10ms 垫话）──▶ 慢脑（LLM 决策链）
 ```
 
-- **<35 token 极简 Prompt 组装**：进 prompt 的只有 3-4 个高显著度离散中文标签，严禁浮点向量
+- **垫话引擎原型已落地（2026-10-06，主人裁定 17 提前先行）**：`engine/filler.py` 脾气掩码粗粒度 3 掩码（irritable/cheerful/aloof）× 8D 状态带规则，`player_says` 结果含 `filler` 字段；T2 落地林传鼎 8 脾气掩码后替换为标准掩码表
+- **<35 token 极简 Prompt 组装**：进 prompt 的只有 3-4 个高显著度离散中文标签，严禁浮点向量（当前过渡态注入 8 参数"名: 值"文本 71 字符，真实 LLM 冒烟已实证其 token 占用，T3 改造输入）
 - 四级算力分流：Tier 0 纯数学物理（<0.1ms）/ Tier 1 规则与哈希（<0.5ms）/ Tier 2 端侧小模型 / Tier 3 云端 LLM（仅深度叙事）——环境 NPC 封印在 Tier 0/1
 
 ### 世界层 v2：人口学村庄（T4）

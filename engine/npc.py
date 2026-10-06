@@ -41,6 +41,7 @@ class Persona:
     tags: Dict[str, float] = field(default_factory=dict)
     appearance: Dict[str, str] = field(default_factory=dict)
     residence: str = ""
+    temperament: str = ""  # 脾气掩码 id（T1 粗粒度先行，T2 落地 8 掩码后替换）
 
     @classmethod
     def from_file(cls, path: str) -> "Persona":
@@ -77,7 +78,7 @@ class Persona:
         return {"id": self.id, "name": self.name, "role": self.role,
                 "location_id": self.location_id, "personality": self.personality,
                 "speech_style": self.speech_style, "tags": self.tags,
-                "residence": self.residence}
+                "residence": self.residence, "temperament": self.temperament}
 
 
 class NPC:
@@ -99,6 +100,9 @@ class NPC:
                 relation="客人", affinity=0.5))
         self.decision = DecisionEngine(persona, llm, relationships=self.relationships)
         self.executor = ActionExecutor(world)
+        # 垫话引擎：脾气掩码 + 8D 当下状态 → 0-token 本地垫话（不进 LLM prompt）
+        from .filler import FillerEngine
+        self.filler_engine = FillerEngine(persona.temperament)
 
         # 注册到世界
         from .world import Entity

@@ -94,10 +94,16 @@ class NPCEngine:
             return {"ok": False, "error": f"unknown npc: {npc_id}"}
 
         # 1) 感知：玩家说话事件入总线 → NPC 写入短期记忆
+        #    （publish 同步分发，StateUpdater 已在此步更新 8D 状态）
         from .world import WorldEvent
         self.world.bus.publish(WorldEvent(
             self.world.tick_count, "player_spoke", "player",
             {"to": npc_id, "text": text}))
+
+        # 1.5) 垫话：慢脑 LLM 调用前同步返回的反应性开场白
+        #      （0-token 本地计算，不注入 LLM prompt；消费的是
+        #      「听到玩家说话」后的反应性 8D 状态）
+        filler = npc.filler_engine.generate(npc.inner_state)
 
         # 2/3) 决策（内部完成记忆检索与上下文组装）
         action: Action = npc.handle_player_input(self.world, text)
@@ -127,6 +133,7 @@ class NPCEngine:
             "npc_id": npc_id,
             "action": action.to_dict(),
             "reply": reply,
+            "filler": filler,
             "state": npc.state_machine.state.value,
             "clock": self.world.clock,
         }

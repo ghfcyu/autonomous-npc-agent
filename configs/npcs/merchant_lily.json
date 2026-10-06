@@ -26,6 +26,7 @@
     "14": "WORKING",
     "21": "SLEEPING"
   },
+  "temperament": "cheerful",
   "tags": {"守财": 0.8},
   "appearance": {"outfit": "商人绸缎马甲"},
   "topic_responses": {

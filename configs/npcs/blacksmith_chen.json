@@ -26,6 +26,7 @@
     "13": "WORKING",
     "20": "SLEEPING"
   },
+  "temperament": "irritable",
   "tags": {"较为自负": 0.7},
   "appearance": {"outfit": "打铁皮围裙", "posture": "站着抡锤"},
   "topic_responses": {

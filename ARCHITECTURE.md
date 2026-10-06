@@ -250,10 +250,13 @@ NPCEngine.tick(minutes)
 
 ```
 Ψ(t) = [ p_fatigue, p_hunger, p_pain, p_drive |  e_P, e_A, e_D |  S_stress ]
-         └── 生理稳态 4D [0,1] ──┘  └─ PAD 心境 3D [-1,1] ─┘  └ 压力 1D ┘
+         └── 生理稳态 4D [0,1] ──┘  └─ PAD 心境 3D [0,1] ─┘  └ 压力 1D ┘
 ```
 
-- 事件 → 心智的通路：**荀子六情映射器**（`XUNZI_EMOTION_VECTORS`：好/恶/喜/怒/哀/乐 → PAD 增量矢量，如"怒"→[-0.08,+0.10,-0.05]）挂在 StateUpdater `_apply_xunzi`，替代逐参数硬编码 ✅
+> 当前实现 PAD 心境值域为 [0,1]（与 `engine/inner_state.py` 的 `apply_delta` clamp 一致）；是否放宽为规范 [-1,1] 属架构级决策，已提请项目主人定夺（2026-10-07）。裁定前 T2 脾气掩码 PAD 分区触发条件设计须标注此依赖。
+
+- 事件 → 心智的通路：**荀子六情映射器**（`XUNZI_EMOTION_VECTORS`：好/恶/喜/怒/哀/乐 → PAD 增量矢量，如"怒"→[-0.08,+0.10,+0.08]）挂在 StateUpdater `_apply_xunzi`，替代逐参数硬编码 ✅
+- 六情矢量缩放与归正记录：代码矢量为规范 `NPC_TAG_DATABASE.md` 2.3 节约 1/6 幅度的 [0,1] 基底小步进缩放版（单事件不跳满格、多事件叠加逼近）；"怒" e_D 与"乐" e_A 两处方向已于 2026-10-07 按审查裁定归正跟随规范（怒 e_D>0 高支配、乐 e_A<0 低唤醒），契约锁测试见 `tests/test_xunzi_emotion.py::TestXunziSpecContractLock`
 - trust 不是心智而是关系 → 迁入 RelationshipNetwork（`update_affinity` 主观亲缘度分量，NPC 初始化注入 player 边）✅
 
 ### 标签层 v2：大一统标签数据库（T2）

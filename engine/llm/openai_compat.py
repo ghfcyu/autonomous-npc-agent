@@ -16,7 +16,7 @@ from typing import Dict, List
 
 from .base import BaseLLMProvider, LLMError
 
-DEFAULT_TIMEOUT = 30
+DEFAULT_TIMEOUT = 60
 
 
 class OpenAICompatProvider(BaseLLMProvider):
@@ -27,8 +27,6 @@ class OpenAICompatProvider(BaseLLMProvider):
         self.base_url = (base_url or os.environ.get("NPC_LLM_BASE_URL", "")).rstrip("/")
         self.api_key = api_key or os.environ.get("NPC_LLM_API_KEY", "")
         self.model = model or os.environ.get("NPC_LLM_MODEL", "gpt-4o-mini")
-        self.last_usage: Dict[str, int] = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
-        self.total_tokens_used: int = 0
 
     @property
     def available(self) -> bool:
@@ -54,7 +52,7 @@ class OpenAICompatProvider(BaseLLMProvider):
         try:
             with urllib.request.urlopen(request, timeout=DEFAULT_TIMEOUT) as resp:
                 body = json.loads(resp.read().decode("utf-8"))
-        except urllib.error.URLError as exc:  # 网络层异常统一包装
+        except OSError as exc:  # 网络层异常统一包装（含 URLError/TimeoutError/ConnectionError）
             raise LLMError(f"LLM request failed: {exc}") from exc
         except json.JSONDecodeError as exc:
             raise LLMError("LLM returned non-JSON body") from exc

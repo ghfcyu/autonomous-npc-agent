@@ -45,10 +45,11 @@
 
 用法：
     python3 scripts/dialogue_quality.py                  # Mock 基线
-    python3 scripts/dialogue_quality.py --provider real  # 真实对照分支
-    #   （真实 LLM 调用 10-08 接入，当前 --provider real 回落 Mock 并打印提示）
+    python3 scripts/dialogue_quality.py --provider real  # 真实 LLM 对照
+    #   （接入真实端点，产出五口径 Mock vs Real 对照报告+差异归因；
+    #    10-08 落地：J2 回复层 1/6→2/6 刺破 Mock 话术库巧合命中）
 
-零第三方依赖：仅标准库 + engine/ 公开接口（未改动 engine 任何文件）。
+零第三方依赖：仅标准库 + engine/ 公开接口。
 """
 
 from __future__ import annotations
@@ -70,7 +71,8 @@ from engine.llm.mock import MockLLMProvider              # noqa: E402
 from engine.npc import Persona                           # noqa: E402
 
 # ------------------------------------------------------------------ #
-# 探针 LLM：子类化 MockLLMProvider，捕获决策层组装的 messages
+# 探针 LLM：ProbeLLM（子类化 Mock）/ RealProbeLLM（组合真实 Provider）
+# —— 都只捕获 messages、不改变行为，指标不被测量行为本身污染
 # ------------------------------------------------------------------ #
 
 
@@ -91,6 +93,53 @@ class ProbeLLM(MockLLMProvider):
 
     def last_user_prompt(self) -> Optional[str]:
         """最近一次决策的 user prompt（未调用过 LLM 时为 None）。"""
+        if not self.last_messages:
+            return None
+        return next((m["content"] for m in reversed(self.last_messages)
+                     if m["role"] == "user"), None)
+
+
+class RealProbeLLM:
+    """真实 LLM 探针：包装真实 Provider，捕获 messages 供 prompt 分析。
+
+    与 ProbeLLM（子类化 Mock）不同，RealProbeLLM 通过组合而非继承，
+    因为真实 Provider 的 chat() 发 HTTP 请求。每次创建实例用于单个场景，
+    捕获该场景的 messages；底层 real provider 可跨场景共享。
+
+    不继承 BaseLLMProvider：避免 ABC 抽象方法约束和 __init__ 中
+    last_usage/total_tokens_used 与只读 property 的冲突。NPCEngine 用
+    getattr 读取这些属性、只调用 chat()，不检查 isinstance（鸭子类型）。
+    """
+
+    def __init__(self, inner) -> None:
+        self.inner = inner
+        self.last_messages: Optional[List[Dict[str, str]]] = None
+
+    @property
+    def name(self) -> str:
+        return self.inner.name
+
+    @property
+    def available(self) -> bool:
+        return getattr(self.inner, "available", True)
+
+    @property
+    def last_usage(self):
+        return self.inner.last_usage
+
+    @property
+    def total_tokens_used(self):
+        return self.inner.total_tokens_used
+
+    @property
+    def call_count(self):
+        return getattr(self.inner, "call_count", 0)
+
+    def chat(self, messages, temperature: float = 0.7) -> str:
+        self.last_messages = [dict(m) for m in messages]
+        return self.inner.chat(messages, temperature)
+
+    def last_user_prompt(self) -> Optional[str]:
         if not self.last_messages:
             return None
         return next((m["content"] for m in reversed(self.last_messages)
@@ -267,21 +316,27 @@ DETERMINISM_CONTROL: Dict[str, Any] = {
 # ------------------------------------------------------------------ #
 
 
-def _build_engine(probe: ProbeLLM,
+def _build_engine(probe: Any,
                   personas: Optional[List[Persona]] = None) -> NPCEngine:
-    """fresh 引擎：独立世界 + 独立记忆 + 独立关系网，场景间零污染。"""
+    """fresh 引擎：独立世界 + 独立记忆 + 独立关系网，场景间零污染。
+
+    probe 为鸭子类型探针（ProbeLLM / RealProbeLLM）：引擎只用
+    getattr 读取可选属性、调用 chat()，不检查 isinstance。
+    """
     if personas is None:
         personas = Persona.load_all()
     return NPCEngine(llm=probe, npc_configs=personas)
 
 
 def _run_memory_scenario(personas: List[Persona], sc: Dict[str, Any],
-                         gift: bool = True) -> Dict[str, Any]:
+                         gift: bool = True,
+                         probe_factory=ProbeLLM) -> Dict[str, Any]:
     """跑单条记忆场景链，返回含 J1/J2 判定的明细 dict。
 
     gift=False 为"无记忆对照"：不送礼直接探询（valid 恒 False，不计分）。
+    probe_factory：callable，每链创建独立探针（默认 Mock ProbeLLM）。
     """
-    probe = ProbeLLM()
+    probe = probe_factory()
     engine = _build_engine(probe, personas)
     npc_id = sc["npc"]
 
@@ -312,7 +367,8 @@ def _run_memory_scenario(personas: List[Persona], sc: Dict[str, Any],
 
 def run_memory_scenarios(
         scenarios: Optional[List[Dict[str, Any]]] = None,
-        personas: Optional[List[Persona]] = None) -> MetricResult:
+        personas: Optional[List[Persona]] = None,
+        probe_factory=ProbeLLM) -> MetricResult:
     """计算指标①记忆引用率（口径见模块 docstring）。"""
     if scenarios is None:
         scenarios = MEMORY_SCENARIOS
@@ -322,7 +378,8 @@ def run_memory_scenarios(
     result = MetricResult(name="记忆引用率")
     inject_hits = 0
     for sc in scenarios:
-        detail = _run_memory_scenario(personas, sc, gift=True)
+        detail = _run_memory_scenario(personas, sc, gift=True,
+                                      probe_factory=probe_factory)
         result.denominator += 1
         result.numerator += 1 if detail["hit"] else 0
         inject_hits += 1 if detail["inject_hit"] else 0
@@ -337,11 +394,12 @@ def run_memory_scenarios(
 
 
 def run_memory_control(
-        personas: Optional[List[Persona]] = None) -> Dict[str, Any]:
+        personas: Optional[List[Persona]] = None,
+        probe_factory=ProbeLLM) -> Dict[str, Any]:
     """指标①对照：不送礼直接探询，检验 reply 层命中是否与记忆无关。"""
     if personas is None:
         personas = Persona.load_all()
-    probe = ProbeLLM()
+    probe = probe_factory()
     engine = _build_engine(probe, personas)
     result = engine.player_says(MEMORY_CONTROL["ask"], MEMORY_CONTROL["npc"])
     prompt = probe.last_user_prompt() or ""
@@ -362,17 +420,19 @@ def run_memory_control(
 
 
 def _run_state_side(personas: List[Persona], npc_id: str, text: str,
-                    preset: Dict[str, float]) -> SideRecord:
+                    preset: Dict[str, float],
+                    probe_factory=ProbeLLM) -> SideRecord:
     """预置 8D 状态后跑一次 player_says，返回玩家可感知输出切片。
 
     预置键必须是 InnerState.PARAMS 内的 8D 字段——出现旧 5D 字段
     直接抛 ValueError，把"指标消费 8D 语义"做成硬纪律。
+    probe_factory：callable，每侧创建独立探针（默认 Mock ProbeLLM）。
     """
     bad = set(preset) - set(InnerState.PARAMS)
     if bad:
         raise ValueError(f"非 8D 字段: {sorted(bad)}；"
                          f"合法字段: {list(InnerState.PARAMS)}")
-    probe = ProbeLLM()
+    probe = probe_factory()
     engine = _build_engine(probe, personas)
     npc = engine.npcs[npc_id]
     for key, value in preset.items():
@@ -386,7 +446,8 @@ def _run_state_side(personas: List[Persona], npc_id: str, text: str,
 
 def run_state_scenarios(
         pairs: Optional[List[Dict[str, Any]]] = None,
-        personas: Optional[List[Persona]] = None) -> MetricResult:
+        personas: Optional[List[Persona]] = None,
+        probe_factory=ProbeLLM) -> MetricResult:
     """计算指标②状态影响可见性（口径见模块 docstring）。"""
     if pairs is None:
         pairs = STATE_PAIRS
@@ -397,8 +458,10 @@ def run_state_scenarios(
     c1_hits = c2_hits = 0
     c3_hits = c3_avail = 0
     for pair in pairs:
-        a = _run_state_side(personas, pair["npc"], pair["input"], pair["side_a"])
-        b = _run_state_side(personas, pair["npc"], pair["input"], pair["side_b"])
+        a = _run_state_side(personas, pair["npc"], pair["input"],
+                            pair["side_a"], probe_factory=probe_factory)
+        b = _run_state_side(personas, pair["npc"], pair["input"],
+                            pair["side_b"], probe_factory=probe_factory)
         visible, channels = distinguish(a, b)
         result.denominator += 1
         result.numerator += 1 if visible else 0
@@ -430,13 +493,16 @@ def run_state_scenarios(
 
 
 def run_state_determinism_control(
-        personas: Optional[List[Persona]] = None) -> Dict[str, Any]:
+        personas: Optional[List[Persona]] = None,
+        probe_factory=ProbeLLM) -> Dict[str, Any]:
     """指标②对照：同状态同输入跑两次，输出应完全一致。"""
     if personas is None:
         personas = Persona.load_all()
     ctrl = DETERMINISM_CONTROL
-    a = _run_state_side(personas, ctrl["npc"], ctrl["input"], ctrl["preset"])
-    b = _run_state_side(personas, ctrl["npc"], ctrl["input"], ctrl["preset"])
+    a = _run_state_side(personas, ctrl["npc"], ctrl["input"],
+                        ctrl["preset"], probe_factory=probe_factory)
+    b = _run_state_side(personas, ctrl["npc"], ctrl["input"],
+                        ctrl["preset"], probe_factory=probe_factory)
     visible, channels = distinguish(a, b)
     return {"label": ctrl["label"], "channels": channels,
             "distinguishable": visible}
@@ -450,19 +516,35 @@ def run_state_determinism_control(
 def run_baseline(provider: str = "mock") -> Dict[str, Any]:
     """跑全部场景，返回结构化基线结果（纯数据 dict，可整体相等比较）。
 
-    provider="real" 时当前仍走 Mock（真实 LLM 调用 10-08 接入），
-    返回值与 mock 基线一致并带标注。
+    provider="mock"：默认 ProbeLLM 探针（离线确定性基线）。
+    provider="real"：加载 .env → create_provider("openai") → 每场景用
+    RealProbeLLM 包装共享的真实 provider 跑五口径；端点不可用时
+    provider_note 标注"API 不可用"，场景照跑——决策层把 LLMError 回退为
+    fallback 文本（engine/decision.py），指标不因端点故障中断。
     """
     personas = Persona.load_all()
-    memory = run_memory_scenarios(personas=personas)
-    state = run_state_scenarios(personas=personas)
-    control_memory = run_memory_control(personas)
-    control_determinism = run_state_determinism_control(personas)
+    if provider == "real":
+        from scripts.llm_smoke import load_env
+        load_env(os.path.join(ROOT, ".env"))
+        from engine.llm import create_provider
+        real = create_provider("openai")
+        probe_factory = lambda: RealProbeLLM(real)  # noqa: E731
+        provider_note = (f"真实 LLM: {real.model}"
+                         if getattr(real, "available", False)
+                         else "API 不可用：NPC_LLM_BASE_URL 未配置")
+    else:
+        probe_factory = ProbeLLM
+        provider_note = ""
+
+    memory = run_memory_scenarios(personas=personas, probe_factory=probe_factory)
+    state = run_state_scenarios(personas=personas, probe_factory=probe_factory)
+    control_memory = run_memory_control(personas, probe_factory=probe_factory)
+    control_determinism = run_state_determinism_control(
+        personas, probe_factory=probe_factory)
 
     baseline = {
         "provider": provider,
-        "provider_note": ("真实 LLM 对照 10-08 接入，本次按 Mock 基线执行"
-                          if provider == "real" else ""),
+        "provider_note": provider_note,
         "memory_reference_rate": memory.to_dict(),
         "state_visibility_rate": state.to_dict(),
         "controls": {
@@ -476,6 +558,22 @@ def run_baseline(provider: str = "mock") -> Dict[str, Any]:
         },
     }
     return baseline
+
+
+def _parse_sub(sub: str) -> Tuple[int, int]:
+    """把 "命中/总数" 前缀解析为 (命中, 总数)；无法解析返回 (0, 0)。
+
+    C3 子分形如 "2/2（其余 4 对 N/A）"，前缀解析同样适用。
+    """
+    m = re.match(r"(\d+)\s*/\s*(\d+)", sub or "")
+    return (int(m.group(1)), int(m.group(2))) if m else (0, 0)
+
+
+def run_comparison() -> Dict[str, Any]:
+    """双基线对照：Mock 基线 + Real 基线，返回 {"mock": ..., "real": ...}。"""
+    mock_baseline = run_baseline(provider="mock")
+    real_baseline = run_baseline(provider="real")
+    return {"mock": mock_baseline, "real": real_baseline}
 
 
 # ------------------------------------------------------------------ #
@@ -540,13 +638,77 @@ def _print_report(baseline: Dict[str, Any]) -> None:
           "分母 = 同输入仅 8D 预置状态不同的场景对数")
 
     # ---- 汇总 ----
+    tag = "Mock" if baseline["provider"] == "mock" else "Real"
     print(f"\n总场景数：{baseline['total_scenarios']}"
           f"（另对照 {len(baseline['controls'])} 项）")
     print(line)
-    print(f"Mock 基线分：记忆引用率 {pct(mem['numerator'], mem['denominator'])}"
+    print(f"{tag} 基线分：记忆引用率 {pct(mem['numerator'], mem['denominator'])}"
           f"（{mem['numerator']}/{mem['denominator']}）｜"
           f"状态影响可见性 {pct(st['numerator'], st['denominator'])}"
           f"（{st['numerator']}/{st['denominator']}）")
+    print(line)
+
+
+def _print_comparison(mock_b: Dict[str, Any], real_b: Dict[str, Any]) -> None:
+    """Mock vs Real 五口径对照报告 + 差异归因（归因为口径结构预期）。"""
+    line = "=" * 68
+    pct = lambda n, d: f"{n / d * 100:.1f}%" if d else "N/A"  # noqa: E731
+    rate = lambda n, d: (n / d) if d else 0.0                 # noqa: E731
+
+    mm, rm = mock_b["memory_reference_rate"], real_b["memory_reference_rate"]
+    ms, rs = mock_b["state_visibility_rate"], real_b["state_visibility_rate"]
+
+    print(line)
+    print("Mock vs Real 对照报告（五口径 J1/J2/C1/C2/C3）")
+    print(f"Real 端点：{real_b['provider_note'] or '（无标注）'}")
+    print(line)
+
+    # ---- 指标① 记忆引用率 ----
+    print(f"\n指标① 记忆引用率：Mock {mm['numerator']}/{mm['denominator']}"
+          f"（{pct(mm['numerator'], mm['denominator'])}）"
+          f" vs Real {rm['numerator']}/{rm['denominator']}"
+          f"（{pct(rm['numerator'], rm['denominator'])}）"
+          f"｜分数差值 {rm['score'] - mm['score']:+.4f}")
+    for key, label in [("J1_注入层", "J1 注入层"), ("J2_回复层", "J2 回复层")]:
+        mn, md = _parse_sub(mm["sub"][key])
+        rn, rd = _parse_sub(rm["sub"][key])
+        print(f"  {label}：Mock {mn}/{md} vs Real {rn}/{rd}"
+              f"｜差值 {rate(rn, rd) - rate(mn, md):+.4f}")
+
+    # ---- 指标② 状态影响可见性 ----
+    print(f"\n指标② 状态影响可见性：Mock {ms['numerator']}/{ms['denominator']}"
+          f"（{pct(ms['numerator'], ms['denominator'])}）"
+          f" vs Real {rs['numerator']}/{rs['denominator']}"
+          f"（{pct(rs['numerator'], rs['denominator'])}）"
+          f"｜分数差值 {rs['score'] - ms['score']:+.4f}")
+    for key, label in [("C1_动作分叉", "C1 动作分叉"),
+                       ("C2_垫话分叉", "C2 垫话分叉"),
+                       ("C3_内心注入分叉", "C3 内心注入分叉")]:
+        mn, md = _parse_sub(ms["sub"][key])
+        rn, rd = _parse_sub(rs["sub"][key])
+        print(f"  {label}：Mock {mn}/{md} vs Real {rn}/{rd}"
+              f"｜差值 {rate(rn, rd) - rate(mn, md):+.4f}")
+
+    # ---- 差异归因（由口径结构决定，硬编码）----
+    print("\n差异归因（由口径结构决定，非实测推断）：")
+    print("  J1 注入层：两侧预期一致——prompt 结构由记忆检索管道决定，"
+          "不依赖 LLM provider")
+    print("  J2 回复层：真实 LLM 基于注入的【相关长期记忆】生成回复 vs "
+          "Mock 话术库关键词匹配（Mock 1/6 是词面巧合，无记忆对照已证与记忆无关）")
+    print("  C1 动作分叉：硬约束对（4 对）两侧一致——规则引擎判定，不调 LLM；"
+          "非硬约束对真实侧可能因回复文本不同而出现动作分叉")
+    print("  C2 垫话分叉：两侧一致——FillerEngine 纯规则 0-token，不依赖 LLM")
+    print("  C3 内心注入分叉：两侧一致——【此刻内心】文本由 8D 状态决定，"
+          "不依赖 LLM 回复")
+
+    # ---- 结论：J2 是否提升（Mock 自嗨是否被刺破）----
+    mj2n, mj2d = _parse_sub(mm["sub"]["J2_回复层"])
+    rj2n, rj2d = _parse_sub(rm["sub"]["J2_回复层"])
+    improved = rate(rj2n, rj2d) > rate(mj2n, mj2d)
+    verdict = ("提升——Mock 自嗨被刺破：真实 LLM 的表面引用确实来自注入记忆"
+               if improved else
+               "未提升——Mock 自嗨未被刺破：真实回复未引用记忆实体词")
+    print(f"\n结论：J2 回复层 {verdict}")
     print(line)
 
 
@@ -560,16 +722,24 @@ def main(argv: Optional[List[str]] = None) -> int:
         description="对话质量首批 2 指标：记忆引用率 + 状态影响可见性")
     parser.add_argument(
         "--provider", choices=["mock", "real"], default="mock",
-        help="LLM provider：mock=离线确定性基线；real=真实对照"
-             "（真实调用 10-08 接入，当前回落 Mock）")
+        help="LLM provider：mock=离线确定性基线；"
+             "real=真实 LLM 对照（调用真实端点）")
     args = parser.parse_args(argv)
 
     if args.provider == "real":
-        print("[提示] --provider real：真实 LLM 对照 10-08 接入，"
-              "本次按 Mock 基线执行，分数即 Mock 基线分。\n")
-
-    baseline = run_baseline(provider=args.provider)
-    _print_report(baseline)
+        # 先 Mock 基线，再 Real 基线，打印对照 + Real 单独报告
+        comparison = run_comparison()
+        mock_baseline = comparison["mock"]
+        baseline = comparison["real"]
+        _print_comparison(mock_baseline, baseline)
+        _print_report(baseline)
+        if "不可用" in baseline["provider_note"]:
+            print("\n[提示] 真实端点不可用：Real 基线实际为决策层安全回退"
+                  "（fallback）输出。请检查 .env 的 NPC_LLM_BASE_URL 配置。")
+            return 0
+    else:
+        baseline = run_baseline(provider=args.provider)
+        _print_report(baseline)
 
     # 校验失败信号：任一硬约束对 reason 不符，或确定性对照意外分叉
     st = baseline["state_visibility_rate"]

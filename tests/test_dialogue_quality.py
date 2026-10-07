@@ -9,18 +9,22 @@
    （即 S_stress / p_fatigue 语义），旧 5D 字段直接抛 ValueError；
 4. 玩家可感知：所有端到端断言落在玩家可见的返回值上——
    result["action"]（refuse/speak 分叉）、result["reply"]（文本变化）、
-   result["filler"]（垫话分叉），不写与玩家输出无关的空测试。
+   result["filler"]（垫话分叉），不写与玩家输出无关的空测试；
+5. RealProbeLLM 探针（--provider real 的测量件）：组合式包装的
+   消息捕获 + 属性代理（inner=MockLLMProvider，不调真实 API，确定性）。
 """
 
 import unittest
 
 from engine.engine import NPCEngine
 from engine.inner_state import InnerState
+from engine.llm.mock import MockLLMProvider
 from engine.npc import Persona
 from scripts.dialogue_quality import (
     MEMORY_SCENARIOS,
     STATE_PAIRS,
     ProbeLLM,
+    RealProbeLLM,
     SideRecord,
     _run_state_side,
     distinguish,
@@ -325,6 +329,68 @@ class TestBaseline(unittest.TestCase):
     def test_total_scenarios(self):
         self.assertEqual(self.first["total_scenarios"],
                          len(MEMORY_SCENARIOS) + len(STATE_PAIRS))   # 12
+
+
+# ------------------------------------------------------------------ #
+# 5. RealProbeLLM 探针（--provider real 的测量件）
+# ------------------------------------------------------------------ #
+
+
+class TestRealProbeLLM(unittest.TestCase):
+    """组合式真实探针：消息捕获 + 属性代理（inner=Mock，不调真实 API）。"""
+
+    def _messages(self):
+        return [
+            {"role": "system", "content": "<!--persona:t1--> 系统提示"},
+            {"role": "user", "content": "【玩家说】苹果甜不甜？"},
+        ]
+
+    def test_real_probe_captures_messages(self):
+        """chat 时捕获完整 messages，last_user_prompt() 返回 user 内容。"""
+        probe = RealProbeLLM(MockLLMProvider())
+        self.assertIsNone(probe.last_messages)
+        self.assertIsNone(probe.last_user_prompt())
+        msgs = self._messages()
+        probe.chat(msgs)
+        self.assertEqual(len(probe.last_messages), 2)
+        self.assertEqual(probe.last_messages[0]["role"], "system")
+        self.assertEqual(probe.last_user_prompt(), "【玩家说】苹果甜不甜？")
+        # 捕获是拷贝：调用后污染原始列表不影响捕获内容
+        msgs.append({"role": "user", "content": "污染"})
+        self.assertEqual(len(probe.last_messages), 2)
+
+    def test_real_probe_proxies_attributes(self):
+        """name/last_usage/total_tokens_used/call_count 代理到 inner provider。"""
+        inner = MockLLMProvider()
+        probe = RealProbeLLM(inner)
+        self.assertEqual(probe.name, "mock")
+        self.assertEqual(probe.call_count, 0)
+        self.assertEqual(probe.total_tokens_used, 0)
+        self.assertEqual(probe.last_usage,
+                         {"prompt_tokens": 0, "completion_tokens": 0,
+                          "total_tokens": 0})
+        probe.chat(self._messages())
+        self.assertEqual(probe.call_count, 1)          # 代理 inner.call_count
+        self.assertGreater(probe.total_tokens_used, 0)
+        self.assertEqual(probe.last_usage, inner.last_usage)
+        # 跨场景共享 inner：两个 probe 包装同一 provider，用量聚合互通
+        probe2 = RealProbeLLM(inner)
+        probe2.chat(self._messages())
+        self.assertEqual(probe.call_count, 2)
+        self.assertEqual(probe2.total_tokens_used, inner.total_tokens_used)
+
+    def test_real_probe_available(self):
+        """available 代理：inner 无该属性时默认 True，有则透传。"""
+        self.assertTrue(RealProbeLLM(MockLLMProvider()).available)
+
+        class _NoEndpoint:
+            name = "stub"
+            available = False
+
+            def chat(self, messages, temperature=0.7):
+                return "{}"
+
+        self.assertFalse(RealProbeLLM(_NoEndpoint()).available)
 
 
 if __name__ == "__main__":

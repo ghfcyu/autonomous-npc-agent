@@ -32,8 +32,6 @@ class MockLLMProvider(BaseLLMProvider):
         self._seen: Dict[str, int] = {}  # npc_id -> 交互次数
         self.call_count: int = 0
         self.call_log: List[str] = []  # 记录每次 chat 调用的 persona_id
-        self.last_usage: Dict[str, int] = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
-        self.total_tokens_used: int = 0
 
     def chat(self, messages: List[Dict[str, str]], temperature: float = 0.7) -> str:
         self.call_count += 1

@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import json
 import os
+import random
+import zlib
 from typing import Any, Dict, List, Optional
 
 from .actions import Action
@@ -85,6 +87,64 @@ class NPCEngine:
                   relationships=self.relationships)
         self.npcs[persona.id] = npc
         return npc
+
+    # ------------------------------------------------------------------ #
+    def mount_tags(self, npc_id: str,
+                   rng: Optional[random.Random] = None) -> Optional["TagLedger"]:
+        """T2 标签挂载（显式 API，默认不启用）：为核心 NPC 创建标签账本。
+
+        规范 5.2：非纯背景环境 NPC 强制挂载 ≥1 显性缺陷 + ≥1 绝密把柄；
+        背景NPC 不在 self.npcs 登记（"非纯背景"语义），天然零挂载。
+        同时把 6D 先天属性称号中的高显著度档 add_innate 进账本：仅
+        attribute_label/beauty_label 的传奇档（与 10.0 端点同文案）或
+        长尾/底级档（与 1.0 端点同文案）——寻常档不注入（token 纪律），
+        档位判定用公开 API 端点探测，不复制阈值数字（正交纪律）。
+
+        称号挂载先于缺陷/把柄挂载：mount_flaw_and_secret 的互斥预检
+        依赖账本中已有的 morality_saint 等先天称号（圣人道德不与
+        暗夜杀人并存）。
+
+        rng=None 时用 zlib.crc32(npc_id) 做种子：跨进程确定性（内建
+        hash() 受 PYTHONHASHSEED 随机化影响，不可用）。
+        返回挂载好的 TagLedger；未知 npc_id 返回 None。
+        """
+        npc = self.npcs.get(npc_id)
+        if npc is None:
+            return None
+        # 延迟 import（项目惯例）：tag_mount 是 T2 新模块，保持本模块可独立加载
+        from .tag_genesis import (attribute_label, beauty_label,
+                                  generate_innate_attributes)
+        from .tag_mount import MountedTag, TagLedger, TagPhase
+
+        if rng is None:
+            rng = random.Random(zlib.crc32(npc_id.encode("utf-8")))
+        innate = generate_innate_attributes(rng)
+        ledger = TagLedger()
+
+        # 6D 高显著度先天称号（beauty 走专属六档 beauty_label）
+        for attr_id in ("strength", "savvy", "courage", "morality", "alcohol_tol"):
+            label = attribute_label(attr_id, getattr(innate, attr_id))
+            if label == attribute_label(attr_id, 10.0):  # 传奇档
+                # morality 传奇档对齐互斥锁 id morality_saint（规范 6.2）
+                tag_id = ("morality_saint" if attr_id == "morality"
+                          else f"attr_{attr_id}_legendary")
+                ledger.add_innate(MountedTag(tag_id=tag_id, label=label,
+                                             phase=TagPhase.INNATE))
+            elif label == attribute_label(attr_id, 1.0):  # 长尾档
+                ledger.add_innate(MountedTag(tag_id=f"attr_{attr_id}_tail",
+                                             label=label, phase=TagPhase.INNATE))
+        beauty = beauty_label(innate.beauty)
+        if beauty == beauty_label(10.0):  # 倾国倾城，对齐互斥锁 id
+            ledger.add_innate(MountedTag(tag_id="beauty_stunning", label=beauty,
+                                         phase=TagPhase.INNATE))
+        elif beauty == beauty_label(1.0):  # 面目可怖，对齐互斥锁 id
+            ledger.add_innate(MountedTag(tag_id="beauty_horrifying", label=beauty,
+                                         phase=TagPhase.INNATE))
+
+        # 强制缺陷 + 把柄（挂载结果进 INNATE 桶，把柄不进决策上下文）
+        ledger.mount_flaw_and_secret(rng, innate=innate)
+        npc.tag_ledger = ledger
+        return ledger
 
     # ------------------------------------------------------------------ #
     def player_says(self, text: str, npc_id: str) -> Dict[str, Any]:

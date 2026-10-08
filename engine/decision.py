@@ -45,7 +45,7 @@ class DecisionEngine:
     # ------------------------------------------------------------------ #
     # 提示词组装
     # ------------------------------------------------------------------ #
-    def _system_prompt(self) -> str:
+    def _system_prompt(self, ledger=None) -> str:
         p = self.persona
         banks = {
             "greeting_bank": p.greeting_bank,
@@ -55,6 +55,15 @@ class DecisionEngine:
         tag_line = ""
         if p.tags:
             tag_line = f"\n性格标签：{'、'.join(f'{k}({v})' for k, v in p.tags.items())}"
+        # T2 身份标签行：仅当账本存在且可见标签非空时注入（空账本零注入，
+        # 与【周围的人】块空不注入同一纪律）。渲染 visible_tags() 的
+        # 离散中文名，顿号连接，严禁浮点权重（<35token 极简组装规范）；
+        # 绝密把柄被 visible_tags() 排除，永不进入决策上下文。
+        identity_line = ""
+        if ledger is not None:
+            labels = [t.label for t in ledger.visible_tags()]
+            if labels:
+                identity_line = f"\n身份标签：{'、'.join(labels)}"
         rel_line = ""
         if self.relationships:
             rel_text = self.relationships.to_prompt_text(self.persona.id)
@@ -67,7 +76,7 @@ class DecisionEngine:
             f"说话风格：{p.speech_style}\n"
             f"背景：{p.backstory}\n"
             f"喜欢：{'、'.join(p.likes)}；讨厌：{'、'.join(p.dislikes)}\n"
-            f"{tag_line}{rel_line}\n\n"
+            f"{tag_line}{identity_line}{rel_line}\n\n"
             f"{OUTPUT_CONTRACT}\n"
             f"<<<banks>>>{json.dumps(banks, ensure_ascii=False)}"
         )
@@ -121,8 +130,9 @@ class DecisionEngine:
 
         memory_ctx = npc.memory.context_for(player_input)
         snapshot = world.snapshot(npc.persona.id)
+        # T2：挂载了标签账本的 NPC 注入身份标签行（getattr 兼容未挂载实例）
         messages = [
-            {"role": "system", "content": self._system_prompt()},
+            {"role": "system", "content": self._system_prompt(getattr(npc, "tag_ledger", None))},
             {"role": "user", "content": self._user_prompt(player_input, world, memory_ctx, snapshot, npc.inner_state)},
         ]
 

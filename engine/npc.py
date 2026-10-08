@@ -104,6 +104,10 @@ class NPC:
         from .filler import FillerEngine
         self.filler_engine = FillerEngine(persona.temperament)
 
+        # T2 标签账本：默认 None。挂载是显式 API（NPCEngine.mount_tags 创建），
+        # None 时决策上下文零身份标签注入，行为与接线前完全一致（向后兼容）。
+        self.tag_ledger = None
+
         # 注册到世界
         from .world import Entity
         self.entity = Entity(id=persona.id, kind="npc", name=persona.name,

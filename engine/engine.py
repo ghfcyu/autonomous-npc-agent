@@ -85,16 +85,22 @@ class NPCEngine:
     def spawn(self, persona: Persona) -> NPC:
         npc = NPC(persona, self.llm, self.world, store_dir=self.store_dir,
                   relationships=self.relationships)
+        # T2 收口先行批（常驻化）：配置声明 tag_profile="genesis" 的核心
+        # NPC 引擎初始化即自动挂载标签账本——"断指的铁匠陈"是 NPC 默认
+        # 状态，而非显式 API 调用结果；rng=None 走 crc32(npc_id) 确定性
+        # 种子（与 mount_tags 同一确定性口径）。
+        if persona.tag_profile == "genesis":
+            npc.tag_ledger = self._build_tag_ledger(persona.id)
         self.npcs[persona.id] = npc
         return npc
 
     # ------------------------------------------------------------------ #
-    def mount_tags(self, npc_id: str,
-                   rng: Optional[random.Random] = None) -> Optional["TagLedger"]:
-        """T2 标签挂载（显式 API，默认不启用）：为核心 NPC 创建标签账本。
+    def _build_tag_ledger(self, npc_id: str,
+                          rng: Optional[random.Random] = None) -> "TagLedger":
+        """构建一张标签账本（mount_tags 显式 API 与 spawn 常驻化共用的内核）。
 
         规范 5.2：非纯背景环境 NPC 强制挂载 ≥1 显性缺陷 + ≥1 绝密把柄；
-        背景NPC 不在 self.npcs 登记（"非纯背景"语义），天然零挂载。
+        背景 NPC 不在 self.npcs 登记（"非纯背景"语义），天然零挂载。
         同时把 6D 先天属性称号中的高显著度档 add_innate 进账本：仅
         attribute_label/beauty_label 的传奇档（与 10.0 端点同文案）或
         长尾/底级档（与 1.0 端点同文案）——寻常档不注入（token 纪律），
@@ -106,11 +112,7 @@ class NPCEngine:
 
         rng=None 时用 zlib.crc32(npc_id) 做种子：跨进程确定性（内建
         hash() 受 PYTHONHASHSEED 随机化影响，不可用）。
-        返回挂载好的 TagLedger；未知 npc_id 返回 None。
         """
-        npc = self.npcs.get(npc_id)
-        if npc is None:
-            return None
         # 延迟 import（项目惯例）：tag_mount 是 T2 新模块，保持本模块可独立加载
         from .tag_genesis import (attribute_label, beauty_label,
                                   generate_innate_attributes)
@@ -132,7 +134,7 @@ class NPCEngine:
                                              phase=TagPhase.INNATE))
             elif label == attribute_label(attr_id, 1.0):  # 长尾档
                 ledger.add_innate(MountedTag(tag_id=f"attr_{attr_id}_tail",
-                                             label=label, phase=TagPhase.INNATE))
+                                            label=label, phase=TagPhase.INNATE))
         beauty = beauty_label(innate.beauty)
         if beauty == beauty_label(10.0):  # 倾国倾城，对齐互斥锁 id
             ledger.add_innate(MountedTag(tag_id="beauty_stunning", label=beauty,
@@ -143,6 +145,25 @@ class NPCEngine:
 
         # 强制缺陷 + 把柄（挂载结果进 INNATE 桶，把柄不进决策上下文）
         ledger.mount_flaw_and_secret(rng, innate=innate)
+        return ledger
+
+    # ------------------------------------------------------------------ #
+    def mount_tags(self, npc_id: str,
+                    rng: Optional[random.Random] = None) -> Optional["TagLedger"]:
+        """T2 标签挂载显式 API：为核心 NPC 创建标签账本并挂到 npc.tag_ledger。
+
+        账本构建逻辑由 _build_tag_ledger 承载（与 spawn 常驻化共用内核）；
+        本方法保持既有签名与行为完全兼容：对任意已登记 NPC（含未声明
+        tag_profile 的）可重复调用重建账本，未知 npc_id 返回 None。
+        默认状态语义见 spawn：声明 tag_profile="genesis" 的 NPC 已自动挂载，
+        无需再调本方法。
+
+        返回挂载好的 TagLedger；未知 npc_id 返回 None。
+        """
+        npc = self.npcs.get(npc_id)
+        if npc is None:
+            return None
+        ledger = self._build_tag_ledger(npc_id, rng)
         npc.tag_ledger = ledger
         return ledger
 

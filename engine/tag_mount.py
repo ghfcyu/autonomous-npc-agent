@@ -31,7 +31,13 @@
    用于 tier 分档，不用于缺陷选择；
 4. "同一 NPC 不重复抽到同一缺陷"（任务书要求）对称扩展到把柄：重复
    调用 mount_flaw_and_secret 时已挂载的缺陷/把柄均从候选池剔除，
-   增量挂载不产生重复条目。
+   增量挂载不产生重复条目；
+5. 候选耗尽 fail-fast（PM 裁定，审查 10-08 指令 3）：缺陷池或把柄池
+   任一被"已挂载+互斥黑名单"剔除殆尽时抛 ValueError，而非静默返回
+   空元组——理由：①本方法契约是"强制挂载 ≥1 缺陷+≥1 把柄"，耗尽
+   即契约不可履行；②创生 API 在 NPC 生命周期正常只调用一次，耗尽
+   即调用方 bug 或标签池设计缺陷；③T4 批量生成器扩池后若池设计
+   有缺陷，fail-fast 当场暴露而非静默产出无标签 NPC。
 
 零第三方依赖，仅 enum/random/dataclasses/typing 标准库。
 """
@@ -185,6 +191,12 @@ class TagLedger:
           构成黑名单——候选自身在黑名单、或候选的对立标签在黑名单时，
           该候选被剔除（圣人道德不与暗夜杀人并存）。innate=None 时仅做
           账本级预检（独立调用/测试场景）。
+        - 候选耗尽契约（PM 裁定 fail-fast）：缺陷池或把柄池任一被
+          "已挂载+互斥黑名单"剔除殆尽 → 抛 ValueError，不静默返回空
+          元组。理由：①本方法契约是"强制挂载 ≥1 缺陷+≥1 把柄"，耗尽
+          即契约不可履行；②创生 API 在 NPC 生命周期正常只调用一次，
+          耗尽即调用方 bug 或标签池设计缺陷；③T4 批量生成器扩池后
+          若池设计有缺陷，fail-fast 当场暴露而非静默产出无标签 NPC。
 
         返回本次新挂载的标签元组（缺陷在前，把柄在后）。
         """
@@ -199,24 +211,32 @@ class TagLedger:
             if flaw[0] not in blacklist
             and _MUTEX_OPPOSITES.get(flaw[0]) not in blacklist
         ]
-        if flaw_candidates:
-            tag_id, label, _desc = rng.choice(flaw_candidates)
-            tag = MountedTag(tag_id=tag_id, label=label, phase=TagPhase.INNATE,
-                             tier=_sample_tier(rng, _FLAW_TIERS))
-            self.add_innate(tag)
-            mounted.append(tag)
+        if not flaw_candidates:
+            raise ValueError(
+                "缺陷池候选耗尽：全部缺陷已被已挂载标签或互斥黑名单剔除，"
+                "强制挂载 ≥1 缺陷的契约不可履行（调用方 bug 或标签池设计"
+                "缺陷，fail-fast 当场暴露，见模块 docstring 偏离 5）")
+        tag_id, label, _desc = rng.choice(flaw_candidates)
+        tag = MountedTag(tag_id=tag_id, label=label, phase=TagPhase.INNATE,
+                         tier=_sample_tier(rng, _FLAW_TIERS))
+        self.add_innate(tag)
+        mounted.append(tag)
 
         secret_candidates = [
             secret for secret in SECRET_POOL
             if secret[0] not in blacklist
             and _MUTEX_OPPOSITES.get(secret[0]) not in blacklist
         ]
-        if secret_candidates:
-            tag_id, label, _desc = rng.choice(secret_candidates)
-            tag = MountedTag(tag_id=tag_id, label=label, phase=TagPhase.INNATE,
-                             tier=_sample_tier(rng, _SECRET_TIERS), secret=True)
-            self.add_innate(tag)
-            mounted.append(tag)
+        if not secret_candidates:
+            raise ValueError(
+                "把柄池候选耗尽：全部把柄已被已挂载标签或互斥黑名单剔除，"
+                "强制挂载 ≥1 把柄的契约不可履行（调用方 bug 或标签池设计"
+                "缺陷，fail-fast 当场暴露，见模块 docstring 偏离 5）")
+        tag_id, label, _desc = rng.choice(secret_candidates)
+        tag = MountedTag(tag_id=tag_id, label=label, phase=TagPhase.INNATE,
+                         tier=_sample_tier(rng, _SECRET_TIERS), secret=True)
+        self.add_innate(tag)
+        mounted.append(tag)
         return tuple(mounted)
 
     # ------------------------------------------------------------------ #

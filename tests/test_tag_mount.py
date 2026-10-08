@@ -443,5 +443,48 @@ class TestOrthogonalityAndDependencies(unittest.TestCase):
                     msg=f"越权 import from: {node.module}")
 
 
+# ========================================================================== #
+# 8. 候选耗尽契约（fail-fast，PM 裁定）
+# ========================================================================== #
+class TestExhaustionContract(unittest.TestCase):
+    """候选耗尽 → ValueError（fail-fast），不得静默返回空元组。
+
+    依据（契约变更书面记录）：mount_flaw_and_secret 的契约是
+    "强制挂载 ≥1 缺陷 + ≥1 把柄"，耗尽即契约不可履行；创生 API 在
+    NPC 生命周期正常只调用一次，耗尽即调用方 bug 或标签池设计缺陷；
+    静默落空会把 bug 掩盖成无标签 NPC（审查 10-08 指令 3 + PM
+    2026-10-09 裁定，模块 docstring 偏离 5）。旧语义"耗尽静默返回
+    空元组"无任何既有用例依赖（全仓 grep 验证：8 处调用均不构造耗尽），
+    本类为契约变更后的首批显式测试。
+    """
+
+    def test_flaw_pool_exhaustion_raises_value_error(self):
+        # 挂满全部 7 条缺陷：缺陷候选全部进"已挂载"黑名单 → 耗尽
+        ledger = TagLedger()
+        for tag_id, label, _desc in FLAW_POOL:
+            ledger.add_innate(MountedTag(tag_id=tag_id, label=label,
+                                         phase=TagPhase.INNATE))
+        with self.assertRaises(ValueError) as ctx:
+            ledger.mount_flaw_and_secret(random.Random(0))
+        self.assertIn("缺陷池候选耗尽", str(ctx.exception))
+
+    def test_secret_pool_exhaustion_raises_value_error(self):
+        # 互斥路径构造：先挂 morality_saint（互斥禁掉 secret_murderer），
+        # 再挂剩余 4 条把柄——5 条把柄全部被"已挂载+互斥黑名单"剔除。
+        # add_innate 不触发互斥锁，先挂的 morality_saint 不会被后续
+        # 挂载动作消除，构造可行（任务书建议的构造方式）。
+        ledger = TagLedger()
+        ledger.add_innate(MountedTag(tag_id="morality_saint", label="高义守节",
+                                     phase=TagPhase.INNATE))
+        for tag_id, label, _desc in SECRET_POOL:
+            if tag_id == "secret_murderer":
+                continue  # 已被互斥黑名单禁掉，无需挂载即天然出局
+            ledger.add_innate(MountedTag(tag_id=tag_id, label=label,
+                                         phase=TagPhase.INNATE, secret=True))
+        with self.assertRaises(ValueError) as ctx:
+            ledger.mount_flaw_and_secret(random.Random(0))
+        self.assertIn("把柄池候选耗尽", str(ctx.exception))
+
+
 if __name__ == "__main__":
     unittest.main()

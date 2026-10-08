@@ -42,6 +42,9 @@ class Persona:
     appearance: Dict[str, str] = field(default_factory=dict)
     residence: str = ""
     temperament: str = ""  # 脾气掩码 id（T1 粗粒度先行，T2 落地 8 掩码后替换）
+    # 标签挂载档位声明："genesis" = 引擎 spawn 时自动构建标签账本（常驻化）；
+    # None/未声明 = 不自动挂载（行为与常驻化前一致）
+    tag_profile: Optional[str] = None
 
     @classmethod
     def from_file(cls, path: str) -> "Persona":
@@ -104,8 +107,10 @@ class NPC:
         from .filler import FillerEngine
         self.filler_engine = FillerEngine(persona.temperament)
 
-        # T2 标签账本：默认 None。挂载是显式 API（NPCEngine.mount_tags 创建），
-        # None 时决策上下文零身份标签注入，行为与接线前完全一致（向后兼容）。
+        # T2 标签账本：默认 None。配置声明 tag_profile="genesis" 的 NPC 在
+        # NPCEngine.spawn 时自动挂载（常驻化）；mount_tags 显式 API 仍可用
+        # （含未声明 tag_profile 的 NPC）。None 时决策上下文零身份标签注入，
+        # 行为与接线前完全一致（向后兼容）。
         self.tag_ledger = None
 
         # 注册到世界

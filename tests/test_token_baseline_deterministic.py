@@ -12,9 +12,15 @@
       注入玩家亲缘度边（NPC 初始化自动建 chen→player / lily→player）。
     两次完整场景实测严格相等，仍在审查硬标准 4400-4800 内。
 
+口径变更史（T2 收口先行批，2026-10-09）：
+    - 4737 → 4769：configs 声明 tag_profile="genesis" 的 chen/lily
+      挂载常驻化，system prompt 增身份标签行（8 字符/次调用×4 次调用），
+      属常驻化身份标签行带来的合法增量（结构性功能变更，非单点裁剪），
+      实测仍在审查硬标准 4400-4800 内。
+
 对抗性设计（先红后绿）：
     红：seed 未固定 → 两次完整场景 total_tokens 概率性不等；
-    绿：seed=42 → 两次 total_tokens 严格相等且恒为 4737 → 通过。
+    绿：seed=42 → 两次 total_tokens 严格相等且恒为 4769 → 通过。
 
 测试路径与命令行复跑完全一致：直接调用 scripts/token_baseline.py 的
 main()（24 tick + 4 对话的完整场景），不做任何桩替换，保证测的就是
@@ -32,10 +38,11 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _BASELINE_SCRIPT_PATH = os.path.join(_PROJECT_ROOT, "scripts",
                                      "token_baseline.py")
 
-# seed=42 固定后的基线值（T1 8D 心智基底迁移后实测，两次运行严格相等）。
+# seed=42 固定后的基线值（T2 收口先行批 chen/lily 挂载常驻化后实测，
+# 两次运行严格相等；4737 → 4769 为常驻化身份标签行带来的合法增量）。
 # 若未来迭代合法改变 token 基线，须有意识更新此值并同步 README/PROGRESS，
 # 不允许数字未经代码验证进入文档（2026-10-04 审查批评项）。
-PINNED_TOTAL_TOKENS = 4737
+PINNED_TOTAL_TOKENS = 4769
 # 审查硬标准区间
 HARD_RANGE = (4400, 4800)
 
@@ -85,7 +92,8 @@ class TestTokenBaselineDeterministic(unittest.TestCase):
             total_first, total_second,
             f"两次完整场景 token 总消耗不一致：{total_first} vs "
             f"{total_second}——随机性未被 seed 固定，基线不可复现")
-        # 数字固化：seed=42 基线恒为 4737（T1 8D 迁移后实测口径）。
+        # 数字固化：seed=42 基线恒为 4769（T2 常驻化后实测口径；
+        # 4737→4769 为常驻化身份标签行带来的合法增量）。
         # 此断言即"数字经代码验证"的流程固化。
         self.assertEqual(
             total_first, PINNED_TOTAL_TOKENS,

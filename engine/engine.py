@@ -14,12 +14,12 @@ import random
 import zlib
 from typing import Any, Dict, List, Optional
 
-from .actions import Action
 from .background_npc import BackgroundNPC
 from .llm import create_provider
 from .llm.base import BaseLLMProvider
 from .npc import NPC, Persona
 from .relationships import RelationshipNetwork
+from .states import NPCState
 from .world import Entity, World, WorldEvent
 
 DEFAULT_BG_CONFIG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -41,6 +41,9 @@ class NPCEngine:
         self.store_dir = store_dir
         self.npcs: Dict[str, NPC] = {}
         self.token_stats: Dict[str, Dict[str, int]] = {}
+        # T3 快脑接管率：total = player_says 有效对话次数，hits = 快脑
+        # 命中次数（0 LLM 调用秒回）。供脚本度量「接管率 ≥50%」目标。
+        self.fast_brain_stats: Dict[str, int] = {"hits": 0, "total": 0}
 
         # 关系网：显式传入 > 默认文件 > 空网络
         if relationships is not None:
@@ -169,7 +172,12 @@ class NPCEngine:
 
     # ------------------------------------------------------------------ #
     def player_says(self, text: str, npc_id: str) -> Dict[str, Any]:
-        """核心对话闭环：感知 → 记忆 → 决策 → 行动。"""
+        """核心对话闭环：感知 → 记忆 → 决策 → 行动。
+
+        T3 快慢脑分流：感知与垫话之后先走快脑规则匹配（0 LLM 调用），
+        命中直接构造 SPEAK Action 执行；未命中走慢脑（决策层 LLM），
+        既有行为零变化（纯旁路向后兼容）。
+        """
         npc = self.npcs.get(npc_id)
         if npc is None:
             return {"ok": False, "error": f"unknown npc: {npc_id}"}
@@ -186,21 +194,35 @@ class NPCEngine:
         #      「听到玩家说话」后的反应性 8D 状态）
         filler = npc.filler_engine.generate(npc.inner_state)
 
-        # 2/3) 决策（内部完成记忆检索与上下文组装）
-        action: Action = npc.handle_player_input(self.world, text)
+        # 1.6) 快脑：高频日常意图规则匹配命中 → 构造 SPEAK 直接执行
+        #      （0 LLM 调用）。SLEEPING 的 NPC 不放行快脑——交慢脑既有
+        #      路径处理（梦呓/REFUSE），睡觉 NPC 说话的拒绝语义不变。
+        fast_action = None
+        if npc.state_machine.state is not NPCState.SLEEPING:
+            fast_action = npc.fast_brain.respond(text, npc, self.world)
+        self.fast_brain_stats["total"] += 1
+        if fast_action is not None:
+            self.fast_brain_stats["hits"] += 1
+            action = fast_action  # 快脑：0 LLM 调用
+        else:
+            # 2/3) 慢脑决策（内部完成记忆检索与上下文组装 + LLM）
+            action = npc.handle_player_input(self.world, text)
 
-        # 4) 行动：执行并回流事件
+        # 4) 行动：执行并回流事件（快慢脑共用同一执行器：SPEAK 均发布
+        #    npc_action 事件回流 + enter_talking）
         reply = npc.executor.execute(action, npc)
 
-        # Token 度量：核心 NPC 对话后聚合（背景 NPC 零 LLM 不进入此路径）
-        usage = getattr(self.llm, "last_usage",
-                        {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0})
-        stats = self.token_stats.setdefault(
-            npc_id, {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "calls": 0})
-        stats["prompt_tokens"] += usage.get("prompt_tokens", 0)
-        stats["completion_tokens"] += usage.get("completion_tokens", 0)
-        stats["total_tokens"] += usage.get("total_tokens", 0)
-        stats["calls"] += 1
+        # Token 度量：仅慢脑路径聚合 LLM usage（快脑命中 0 LLM 调用，
+        # 不得读取 llm.last_usage 的上次慢脑残留值，calls 也不 +1）
+        if fast_action is None:
+            usage = getattr(self.llm, "last_usage",
+                            {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0})
+            stats = self.token_stats.setdefault(
+                npc_id, {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "calls": 0})
+            stats["prompt_tokens"] += usage.get("prompt_tokens", 0)
+            stats["completion_tokens"] += usage.get("completion_tokens", 0)
+            stats["total_tokens"] += usage.get("total_tokens", 0)
+            stats["calls"] += 1
 
         # 记忆巩固（溢出才触发）
         npc.memory.consolidate()
@@ -217,6 +239,9 @@ class NPCEngine:
             "filler": filler,
             "state": npc.state_machine.state.value,
             "clock": self.world.clock,
+            # T3：本次对话走的脑（fast = 快脑秒回，slow = 慢脑 LLM），
+            # 供测试与脚本度量接管率
+            "brain": "fast" if fast_action is not None else "slow",
         }
 
     # ------------------------------------------------------------------ #
@@ -293,6 +318,8 @@ class NPCEngine:
                 "total_tokens": getattr(self.llm, "total_tokens_used", 0),
                 "llm_calls": getattr(self.llm, "call_count", 0),
             },
+            # T3 快脑接管率（hits/total，player_says 累计）
+            "fast_brain": self.fast_brain_stats,
         }
 
     def move_player(self, location_id: str) -> Dict[str, Any]:

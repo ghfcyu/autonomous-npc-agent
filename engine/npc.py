@@ -106,6 +106,11 @@ class NPC:
         # 垫话引擎：脾气掩码 + 8D 当下状态 → 0-token 本地垫话（不进 LLM prompt）
         from .filler import FillerEngine
         self.filler_engine = FillerEngine(persona.temperament)
+        # T3 快脑引擎：高频日常意图的 0-token 规则分流。所有 NPC 持有
+        # （匹配只看玩家文本与世界状态，与脾气掩码无关）；脾气只决定
+        # 命中后回复的语气变体。未命中返回 None 落回慢脑，行为零变化。
+        from .fast_brain import FastBrain
+        self.fast_brain = FastBrain()
 
         # T2 标签账本：默认 None。配置声明 tag_profile="genesis" 的 NPC 在
         # NPCEngine.spawn 时自动挂载（常驻化）；mount_tags 显式 API 仍可用

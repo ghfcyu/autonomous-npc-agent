@@ -158,6 +158,9 @@ WorldEvent（事件总线发布）
       → NPC._on_event 写入短期记忆
       → StateUpdater.on_event 更新内状态（e_A+0.05, S_stress+0.05）
   → FillerEngine.generate(反应性 8D 状态) → 垫话占位（慢脑前同步返回，0-token）
+  → FastBrain.respond()（T3 快脑判定，0-token）："能帮我打一把剑吗？"
+      未命中 5 意图规则 → 落回慢脑（若命中如"铁匠铺怎么走"则直接产出
+      SPEAK Action 秒回，跳过下方整个慢脑链，返回 brain="fast"）
   → NPC.handle_player_input()
       → StateMachine 检查：WORKING 状态允许 TALKING ✓
       → InnerState 硬约束检查：S_stress ≤ 0.8 且 p_fatigue ≤ 0.85 ✓
@@ -281,8 +284,60 @@ NPCEngine.tick(minutes)
 ```
 
 - **垫话引擎原型已落地（2026-10-06，主人裁定 17 提前先行）**：`engine/filler.py` 脾气掩码粗粒度 3 掩码（irritable/cheerful/aloof）× 8D 状态带规则，`player_says` 结果含 `filler` 字段；T2 落地林传鼎 8 脾气掩码后替换为标准掩码表
+- **快脑 FastBrain 原型落地（2026-10-09 22:00，`engine/fast_brain.py`）**：greet/ask_direction/ask_price/farewell/ask_time 五意图规则匹配，命中直接产出 SPEAK Action 0-token 秒回（跳过慢脑 LLM 决策链）；`player_says` 返回新增 `"brain": "fast"|"slow"` 分流路径字段，引擎 `fast_brain_stats = {"hits": n, "total": m}` 接管率统计（`status()` 含 `fast_brain` 字段），接管率实测 `scripts/fast_brain_takeover.py`（12 条混合对话口径，期望 8/12 ≈ 66.7%，验收线 ≥50%）；接线设计与掩码 id 统一方案见下节
 - **<35 token 极简 Prompt 组装**：进 prompt 的只有 3-4 个高显著度离散中文标签，严禁浮点向量（当前过渡态注入 8 参数"名: 值"文本 71 字符，真实 LLM 冒烟已实证其 token 占用，T3 改造输入）
 - 四级算力分流：Tier 0 纯数学物理（<0.1ms）/ Tier 1 规则与哈希（<0.5ms）/ Tier 2 端侧小模型 / Tier 3 云端 LLM（仅深度叙事）——环境 NPC 封印在 Tier 0/1
+
+### 快慢脑分流与掩码 id 统一接线设计（T3，2026-10-09 书面先行）
+
+> 审查指令 2 要求"filler 与 temperament_table 掩码 id 体系统一的接线设计先行书面记录"+"快脑接管率实测"。本节为 T3 快慢脑批的设计裁定记录：快脑分流结构当日原型落地；掩码 id 统一为 PAD 值域裁定后执行的接线预案（书面先行，未实施）。
+
+**1. 快慢脑分流结构**
+
+`player_says` 分流顺序：**感知 → 垫话 → 快脑判定 →（未命中）慢脑**：
+
+```
+玩家输入
+  → 感知：player_spoke 事件 → 记忆写入 + 8D 状态更新（既有链路不变）
+  → 垫话：FillerEngine 反应性开场白（0-token 本地计算，先行返回——
+          无论快慢脑命中与否，玩家先拿到反应性占位。此为实施口径，
+          与上方 v2 目标态图"未命中才垫话"的先后差异：实施以先行
+          返回的即时反馈优先，垫话语义是"听到玩家说话的第一反应"）
+  → 快脑判定：FastBrain 意图规则匹配（engine/fast_brain.py，<20ms，0 token）
+      ├─ 命中 5 意图（greet/ask_direction/ask_price/farewell/ask_time）
+      │    → SPEAK Action 直接执行秒回——跳过慢脑 LLM 决策链，零 LLM 调用
+      └─ 未命中 → 慢脑：记忆检索 → 上下文组装 → LLM → Action 校验执行（既有链路）
+```
+
+- **FastBrain（快脑）**：5 意图规则匹配——greet（招呼）/ask_direction（问路）/ask_price（问价）/farewell（道别）/ask_time（问时）五类高频日常输入，命中即产出 SPEAK Action 0-token 秒回；规则路径为 Tier 1 级（规则与哈希），不进 LLM
+- **FillerEngine（垫话）**：既有 `engine/filler.py` 反应性开场白，位于快脑判定之前（分流顺序见上）
+- **慢脑**：既有 LLM 决策链——记忆检索 → 上下文组装 → LLM → Action 校验执行
+- **接管率统计口径**：引擎属性 `fast_brain_stats = {"hits": n, "total": m}`（快脑命中数/对话总数），`status()` 含 `fast_brain` 字段；实测脚本 `scripts/fast_brain_takeover.py` 固化 12 条混合对话口径（8 条五意图高频日常 + 4 条复杂话题，seed=42 确定性复现），期望接管率 8/12 ≈ 66.7%
+
+**2. filler 与 temperament_table 掩码 id 体系统一方案（PAD 裁定后接线）**
+
+现状（两套掩码 id 并存的过渡态——触发条件层已规范化、模板层仍为先行版）：
+
+- `engine/filler.py`（垫话模板层）：粗粒度 3 掩码 id（irritable/cheerful/aloof）——主人裁定 17 允许的先行版（2026-10-06）；configs 的 `temperament` 字段当前即用此 id（chen="irritable"、lily="cheerful"）
+- `engine/temperament_table.py`（触发条件层）：规范 7.2 节 8 脾气 id（TEMP_SERENE/TEMP_JOYFUL/TEMP_WRATHFUL/TEMP_MELANCHOLIC/TEMP_FEARFUL/TEMP_REVERENT/TEMP_ARROGANT/TEMP_ASHAMED）——双值域分区表已落地（2026-10-08），`ACTIVE_PAD_VERSION` 一处切换（当前 "v01" 即 [0,1] 分区），待主人 PAD 值域裁定激活
+
+统一方案（主人 PAD 裁定后执行，当前书面先行）：
+
+- **id 映射**：filler 与 fast_brain 的掩码 id 迁移到规范 8 脾气 id 体系——irritable→TEMP_WRATHFUL（暴躁）、cheerful→TEMP_JOYFUL（喜悦）、aloof→TEMP_SERENE（安静）；configs 的 `temperament` 字段值随之更新
+- **兼容窗口**：旧 id 保留别名兼容一个迁移窗口（掩码表同时接受新旧 key），窗口期后移除别名
+- **单一掩码源纪律**（防共线性死穴——同一脾气现象严禁两套变量）：垫话模板与快脑语气变体共用同一掩码表，脾气掩码的定义、状态带、模板文案一处维护
+- **触发条件对齐**：掩码激活态（当前 [0,1] 分区）由 temperament_table predicate 判定（8 判定函数阈值全部引用 `active_partition()`，随 `ACTIVE_PAD_VERSION` 切换）；filler/fast_brain 的状态带与 predicate 阈值对齐——核对项：掩码表内不得出现 predicate 阈值之外的第二套阈值数字（正交纪律）
+- **接线步骤**（PAD 裁定后按序执行）：
+  ① `ACTIVE_PAD_VERSION` 切换激活裁定值域；
+  ② configs `temperament` 值换新 id（irritable→TEMP_WRATHFUL 等）；
+  ③ filler/fast_brain 掩码表 key 换新 id（别名窗口开启）；
+  ④ 回归测试（filler/fast_brain/temperament_table 契约锁 + `scripts/fast_brain_takeover.py` 复跑），全绿后关闭别名窗口
+
+**3. token 结构性下降口径**
+
+- **结构性削减 vs 单点裁剪**：快脑 0-token 秒回是反内卷裁定 16 认可的结构性削减手段——意图命中的对话整条跳过 LLM（prompt+completion 双侧归零），区别于上下文裁剪（`RECENT_CONTEXT_WINDOW` 6→4）这类单点裁剪（只削单次 prompt 体量）
+- **接管率验收线**：快脑接管率 ≥50%（`fast_brain_stats.hits / total`）为对抗升级验收线，实测口径见 `scripts/fast_brain_takeover.py`
+- **<35 token 极简组装（T3 下一步）**：慢脑 8 参数浮点文本（"名: 值"×8，71 字符）→ 3-4 个高显著度离散中文标签；本设计节预留接口位置——`engine/decision.py` 上下文组装层（【此刻内心】状态行生成处），严禁浮点向量进 prompt
 
 ### 世界层 v2：人口学村庄（T4）
 
@@ -294,7 +349,7 @@ NPCEngine.tick(minutes)
 > 审查指令（10-06 第六次审查指令 3）要求：`docs/architecture.png` 重画必须覆盖以下组件，缺项判文档失同步。
 
 1. **FillerEngine 旁路组件**：`engine/filler.py` 脾气掩码×8D 状态 → 同步垫话，`player_says` 链路中慢脑调用前的 0-token 旁路（10-06 落地，图未收录）；
-2. **快慢脑分流结构**：快脑意图规则匹配（0-token 秒回）与慢脑 LLM 决策链的双通道分流门（T3 主体）；
+2. **快慢脑分流结构**：快脑意图规则匹配（`engine/fast_brain.py` FastBrain，0-token 秒回，原型 2026-10-09 22:00 落地）与慢脑 LLM 决策链的双通道分流门（T3 主体）；
 3. **标签库层（tag_genesis + tag_mount）**：`engine/tag_genesis.py` 先天属性创生模块（6D 正态+金字塔/齐普夫分布+尧氏风格，10-07 落地）与 `engine/tag_mount.py` 标签挂载账本（缺陷/把柄/四时态/互斥锁，10-08 落地）作为决策上游的离散标签供给层；
 4. T2 主体（8 脾气掩码接入决策链）与 T4 人口学生成器若有架构级数据流新增，一并入图。
 

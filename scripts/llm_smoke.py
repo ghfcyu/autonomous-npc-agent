@@ -128,11 +128,13 @@ def main() -> int:
         print(f"  {npc_id:<6} prompt={s['prompt_tokens']}"
               f" completion={s['completion_tokens']}"
               f" total={s['total_tokens']} calls={s['calls']}")
-    # <35token 实证输入：8D 参数文本的 token 占用（垫话 0-token，不进 prompt）
+    # <35token 实证输入：8D 离散标签文本的 token 占用（垫话 0-token，不进 prompt）
     for npc_id, npc in sorted(engine.npcs.items()):
-        params_text = npc.inner_state.to_prompt_text()
-        print(f"  8 参数文本实证（{npc_id}）：{params_text}"
-              f"（{len(params_text)} 字符；8 组「名: 值」≈4 token/参数，<35token 极简输入段）")
+        tags = npc.inner_state.to_discrete_tags()
+        tags_text = "、".join(tags)
+        print(f"  离散标签实证（{npc_id}）：{tags_text}"
+              f"（{len(tags_text)} 字符，{len(tags)} 个标签；≤4 个离散中文标签"
+              f" vs 旧 8 参数 71 字符浮点文本，<35token 极简输入段）")
     print("-" * 64)
 
     print(f"\n{'✓ 冒烟通过' if failures == 0 else f'✗ {failures} 个用例失败'}")

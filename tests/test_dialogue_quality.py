@@ -45,7 +45,7 @@ SAMPLE_PROMPT = (
     "【相关长期记忆】\n- 收到来自 player 的物品：铁矿石\n\n"
     "【最近的经历】\n- 玩家说：上次送你的矿石，成色怎么样？\n\n"
     "【当前世界】时间 08:00，天气 晴，你在 铁匠铺\n"
-    "【此刻内心】疲劳: 0.25，压力: 0.83\n"
+    "【此刻内心】疲倦不堪、心烦意乱\n"
     "【玩家说】上次送你的矿石，成色怎么样？"
 )
 
@@ -94,8 +94,10 @@ class TestCalibrationHelpers(unittest.TestCase):
         self.assertEqual(extract_block("", "【相关长期记忆】"), "")
 
     def test_extract_inner_line(self):
+        # 离散标签口径（8D 状态带离散化，2026-10-10）：自构 fixture
+        # 随生产链路同步为离散文本，锁住提取函数兼容新行内容
         self.assertEqual(extract_inner_line(SAMPLE_PROMPT),
-                         "疲劳: 0.25，压力: 0.83")
+                         "疲倦不堪、心烦意乱")
         # 未调用 LLM（硬约束拒绝）→ prompt 为 None → None
         self.assertIsNone(extract_inner_line(None))
 
@@ -123,8 +125,8 @@ class TestDistinguish(unittest.TestCase):
         self.assertIsNone(ch["C3_inner"])  # REFUSE 侧无 LLM 调用 → N/A
 
     def test_filler_fork_c2(self):
-        a = SideRecord(action={"action": "speak", "text": "嗯"}, filler="（笑盈盈）客官来啦！", inner="愉悦: 0.50")
-        b = SideRecord(action={"action": "speak", "text": "嗯"}, filler="（勉强笑）有何吩咐？", inner="愉悦: 0.50")
+        a = SideRecord(action={"action": "speak", "text": "嗯"}, filler="（笑盈盈）客官来啦！", inner="心情愉悦")
+        b = SideRecord(action={"action": "speak", "text": "嗯"}, filler="（勉强笑）有何吩咐？", inner="心情愉悦")
         visible, ch = distinguish(a, b)
         self.assertTrue(visible)
         self.assertFalse(ch["C1_action"])
@@ -132,9 +134,12 @@ class TestDistinguish(unittest.TestCase):
         self.assertFalse(ch["C3_inner"])
 
     def test_inner_fork_c3_only(self):
-        """仅【此刻内心】注入分叉（Mock 回复不变的带内场景）→ 仍计可区分。"""
-        a = SideRecord(action={"action": "speak", "text": "嗯"}, filler="x", inner="压力: 0.25")
-        b = SideRecord(action={"action": "speak", "text": "嗯"}, filler="x", inner="压力: 0.55")
+        """仅【此刻内心】离散标签分叉（Mock 回复不变的跨带场景）→ 仍计可区分。
+
+        fixture 同步离散口径（8D 状态带离散化，2026-10-10）：旧浮点文本
+        "压力: 0.25/0.55"改为离散标签。"""
+        a = SideRecord(action={"action": "speak", "text": "嗯"}, filler="x", inner="心境平稳")
+        b = SideRecord(action={"action": "speak", "text": "嗯"}, filler="x", inner="心烦意乱")
         visible, ch = distinguish(a, b)
         self.assertTrue(visible)
         self.assertFalse(ch["C1_action"])
@@ -143,7 +148,7 @@ class TestDistinguish(unittest.TestCase):
 
     def test_identical_sides_not_distinguishable(self):
         """同状态同输入两侧完全一致 → 不可区分（口径不是恒 1）。"""
-        a = SideRecord(action={"action": "speak", "text": "嗯"}, filler="x", inner="压力: 0.25")
+        a = SideRecord(action={"action": "speak", "text": "嗯"}, filler="x", inner="心境平稳")
         visible, ch = distinguish(a, a)
         self.assertFalse(visible)
         self.assertFalse(any(v is True for v in ch.values()))
@@ -268,15 +273,20 @@ class TestStateVisibility8D(unittest.TestCase):
         self.assertNotEqual(fresh["reply"], tired["reply"])
 
     def test_inner_prompt_line_changes_with_state(self):
-        """【此刻内心】注入文本随 8D 预置状态变化（真实 LLM 传导通道）。"""
+        """【此刻内心】离散标签随 8D 预置状态变化（真实 LLM 传导通道）。
+
+        功能变更（8D 状态带离散化，2026-10-10）：旧断言“压力: 0.25/
+        0.55”浮点文本随旧浮点文本方法删除失效；带内微差（事件后
+        0.25 vs 0.55 同在常带）按 <35token 极简组装不再注入，改用
+        跨带预置锁住“跨带状态差 → 离散标签分叉”口径。"""
         personas = Persona.load_all()
         a = _run_state_side(personas, "chen", "最近生意怎么样？", {"S_stress": 0.2})
-        b = _run_state_side(personas, "chen", "最近生意怎么样？", {"S_stress": 0.5})
-        # 事件后 +0.05 → 0.25 / 0.55，均不触硬约束，两侧都调用了 LLM
+        b = _run_state_side(personas, "chen", "最近生意怎么样？", {"S_stress": 0.65})
+        # 事件后 +0.05 → 0.25（常带）/ 0.70（>0.6 高压带），均不触硬约束
         self.assertIsNotNone(a.inner)
         self.assertIsNotNone(b.inner)
-        self.assertIn("压力: 0.25", a.inner)
-        self.assertIn("压力: 0.55", b.inner)
+        self.assertEqual(a.inner, "心境平稳")
+        self.assertEqual(b.inner, "心烦意乱")
         self.assertNotEqual(a.inner, b.inner)
 
 
@@ -311,8 +321,10 @@ class TestBaseline(unittest.TestCase):
         self.assertEqual(st["denominator"], len(STATE_PAIRS))        # 6 对
         self.assertEqual(st["numerator"], 6)
         self.assertEqual(st["score"], 1.0)
+        # C2 从 2/6 → 3/6：chen-S_stress跨带对 side_b 上移至高压带后
+        # irritable 高压垫话也分叉（8D 状态带离散化功能变更，2026-10-10）
         self.assertEqual(st["sub"]["C1_动作分叉"], "4/6")
-        self.assertEqual(st["sub"]["C2_垫话分叉"], "2/6")
+        self.assertEqual(st["sub"]["C2_垫话分叉"], "3/6")
         self.assertEqual(st["sub"]["C3_内心注入分叉"], "2/2（其余 4 对 N/A）")
 
     def test_no_memory_control_proves_repetition(self):

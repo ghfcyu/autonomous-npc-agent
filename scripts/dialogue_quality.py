@@ -34,11 +34,14 @@
       C2 垫话分叉：result["filler"] 文本不同——player_says 直接返回给
          玩家，FillerEngine 消费事件后 8D（irritable 掩码 S_stress>0.6
          分带、cheerful 掩码 e_P 分带）；
-      C3 内心注入分叉：决策 user prompt 的【此刻内心】行不同——真实
-         LLM 下该差异传导为回复差异的通道；硬约束 REFUSE 侧不调用
-         LLM、无 prompt，C3 记 N/A（不算命中也不算失败）。
+      C3 内心注入分叉：决策 user prompt 的【此刻内心】行（8D 离散标签，
+          ≤4 个高显著度中文词，无浮点）不同——真实 LLM 下该差异传导为
+          回复差异的通道；硬约束 REFUSE 侧不调用 LLM、无 prompt，C3 记
+          N/A（不算命中也不算失败）。
     维度覆盖：S_stress 硬约束对、p_fatigue 硬约束对（chen/lily 各一），
-    非硬约束可见带对（chen S_stress 压力带 → C3；lily e_P 愉悦带 → C2+C3）。
+    非硬约束跨带对（chen S_stress 压力带 → C2+C3；lily e_P 愉悦带 →
+    C2+C3）。带内微差（同在常带）不再注入【此刻内心】，是
+    <35token 极简组装的正确语义，非指标退化。
 
 结果确定性：所有场景使用 ``MockLLMProvider(seed=42, chaos_rate=0)``，
 每链/每侧独立 fresh engine，相同输入恒同分，连续运行可复现。
@@ -294,9 +297,14 @@ STATE_PAIRS: List[Dict[str, Any]] = [
     {"npc": "lily", "input": "最近生意怎么样？",
      "side_a": {"p_fatigue": 0.2}, "side_b": {"p_fatigue": 0.9},
      "expect_reason": "fatigue_too_high", "label": "lily-p_fatigue硬约束"},
-    # 非硬约束可见带：两侧均不触发 REFUSE（事件后 S_stress 0.25 / 0.55）
+    # 非硬约束跨带对（离散标签口径）：side_b 事件后 0.70 >
+    # BAND_STRESS_HIGH(0.6) 高压带 → “心烦意乱”离散标签（C3）+
+    # irritable 高压垫话（C2）双分叉。旧 side_b=0.5（事件后 0.55）
+    # 与 side_a 同在常带，8D 离散化后【此刻内心】同为“心境平稳”
+    # 不再分叉——带内微差不注入是 <35token 极简组装的正确语义，
+    # 故上移至带上方（2026-10-10 离散化功能变更同步）。
     {"npc": "chen", "input": "最近生意怎么样？",
-     "side_a": {"S_stress": 0.2}, "side_b": {"S_stress": 0.5},
+     "side_a": {"S_stress": 0.2}, "side_b": {"S_stress": 0.65},
      "expect_reason": None, "label": "chen-S_stress内心可见带"},
     # e_P 愉悦带：cheerful 垫话掩码 e_P>0.7 / e_P<0.4 两带分叉
     {"npc": "lily", "input": "最近生意怎么样？",

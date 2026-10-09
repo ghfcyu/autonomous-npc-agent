@@ -224,8 +224,13 @@ class TestBackgroundNPCEngineIntegration(unittest.TestCase):
         # 背景 NPC 的规则反应：零 LLM 调用
         self.assertEqual(mock.call_count, 0)
         self.assertEqual(mock.call_log, [])
-        # 对照：核心 NPC 对话才走 LLM，且日志只含核心 NPC 的 persona id
-        result = engine.player_says("你好呀", "lily")
+        # 对照：核心 NPC 对话才走 LLM，且日志只含核心 NPC 的 persona id。
+        # 本句原为「你好呀」——第九次审查指令 1 裁定其入 GREET_PHRASES
+        # 快脑秒回（不再走 LLM）；本测试原意是"核心 NPC 对话走 LLM、
+        # 背景 NPC 零 LLM"对照而非锁问候语走慢脑，故改用不命中快脑
+        # 五意图的慢脑必达复杂句（已核不匹配 greet/farewell/问价句尾/
+        # 时间问法/问路句式）。
+        result = engine.player_says("你的货最近怎么样？", "lily")
         self.assertTrue(result["ok"])
         self.assertIn("lily", mock.call_log)
         self.assertNotIn("old_zhang", mock.call_log)

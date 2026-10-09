@@ -60,7 +60,7 @@ WorldEvent（事件总线发布）
         ▼
 InnerState（8D 正交基底：p_fatigue/p_hunger/p_pain/p_drive + e_P/e_A/e_D + S_stress，值域 [0,1]）
         │
-        ├─→ to_prompt_text() → 注入决策上下文【此刻内心】
+        ├─→ to_discrete_tags()（8D→离散标签，≤4 个）→ 注入决策上下文【此刻内心】
         └─→ decide() 硬约束检查（S_stress>0.8 拒绝 / p_fatigue>0.85 收摊）
 ```
 
@@ -127,7 +127,7 @@ WorldEvent（事件总线发布）
 
 1. 硬规则前置：当前状态是否允许对话？（SLEEPING → 直接产出"睡梦中嘟囔"的回退动作）
 2. 内状态硬约束：压力负荷 S_stress > 0.8 → 拒绝接单；疲劳 p_fatigue > 0.85 → 提前收摊
-3. 上下文组装：人格卡 + 性格标签 + **人际关系** + 相关长期记忆 + 短期记忆（**`RECENT_CONTEXT_WINDOW=4`** 上下文裁剪，削减 prompt token）+ 世界快照（含**【周围的人】**同地点实体及外观，G5）+ **此刻内心状态** + 玩家输入 + 输出 JSON 契约
+3. 上下文组装：人格卡 + 性格标签 + **人际关系** + 相关长期记忆 + 短期记忆（**`RECENT_CONTEXT_WINDOW=4`** 上下文裁剪，削减 prompt token）+ 世界快照（含**【周围的人】**同地点实体及外观，G5）+ **此刻内心状态（8D 状态带离散标签，≤4 个高显著度中文词，无浮点）** + 玩家输入 + 输出 JSON 契约
 4. LLM 生成结构化动作
 5. 校验失败/解析异常 → 人格自带的 `fallback_bank` 安全回退
 
@@ -285,7 +285,7 @@ NPCEngine.tick(minutes)
 
 - **垫话引擎原型已落地（2026-10-06，主人裁定 17 提前先行）**：`engine/filler.py` 脾气掩码粗粒度 3 掩码（irritable/cheerful/aloof）× 8D 状态带规则，`player_says` 结果含 `filler` 字段；T2 落地林传鼎 8 脾气掩码后替换为标准掩码表
 - **快脑 FastBrain 原型落地（2026-10-09 22:00，`engine/fast_brain.py`）**：greet/ask_direction/ask_price/farewell/ask_time 五意图规则匹配，命中直接产出 SPEAK Action 0-token 秒回（跳过慢脑 LLM 决策链）；`player_says` 返回新增 `"brain": "fast"|"slow"` 分流路径字段，引擎 `fast_brain_stats = {"hits": n, "total": m}` 接管率统计（`status()` 含 `fast_brain` 字段），接管率实测 `scripts/fast_brain_takeover.py`（12 条混合对话口径，期望 8/12 ≈ 66.7%，验收线 ≥50%）；接线设计与掩码 id 统一方案见下节
-- **<35 token 极简 Prompt 组装**：进 prompt 的只有 3-4 个高显著度离散中文标签，严禁浮点向量（当前过渡态注入 8 参数"名: 值"文本 71 字符，真实 LLM 冒烟已实证其 token 占用，T3 改造输入）
+- **<35 token 极简 Prompt 组装已落地（2026-10-10）**：`InnerState.to_discrete_tags()` 把 8D 映射为 ≤4 个高显著度离散中文标签（阈值常量 `BAND_*` 全仓单一来源，filler.py 掩码同源引用），按偏离幅度降序取 top4、全常带返回"心境平稳"；【此刻内心】行从 8 参数"名: 值"浮点文本（71 字符≈32 token）改为离散标签，旧 `to_prompt_text()` 按无双轨纪律删除，token 基线 4769→4501（-268，4 次慢脑调用实测）
 - 四级算力分流：Tier 0 纯数学物理（<0.1ms）/ Tier 1 规则与哈希（<0.5ms）/ Tier 2 端侧小模型 / Tier 3 云端 LLM（仅深度叙事）——环境 NPC 封印在 Tier 0/1
 
 ### 快慢脑分流与掩码 id 统一接线设计（T3，2026-10-09 书面先行）
@@ -337,7 +337,7 @@ NPCEngine.tick(minutes)
 
 - **结构性削减 vs 单点裁剪**：快脑 0-token 秒回是反内卷裁定 16 认可的结构性削减手段——意图命中的对话整条跳过 LLM（prompt+completion 双侧归零），区别于上下文裁剪（`RECENT_CONTEXT_WINDOW` 6→4）这类单点裁剪（只削单次 prompt 体量）
 - **接管率验收线**：快脑接管率 ≥50%（`fast_brain_stats.hits / total`）为对抗升级验收线，实测口径见 `scripts/fast_brain_takeover.py`
-- **<35 token 极简组装（T3 下一步）**：慢脑 8 参数浮点文本（"名: 值"×8，71 字符）→ 3-4 个高显著度离散中文标签；本设计节预留接口位置——`engine/decision.py` 上下文组装层（【此刻内心】状态行生成处），严禁浮点向量进 prompt
+- **<35 token 极简组装（已落地 2026-10-10）**：慢脑【此刻内心】行从 8 参数浮点文本（"名: 值"×8，71 字符）改为 3-4 个高显著度离散中文标签（`engine/inner_state.py` 的 `to_discrete_tags()` + `BAND_*` 阈值常量单一来源，filler.py 掩码同源）；红线预防测试已固化（`TestPromptTokenRedline`：该行浮点零匹配/标签 ≤4/全常带单标签）
 
 ### 世界层 v2：人口学村庄（T4）
 

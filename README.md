@@ -36,7 +36,8 @@ AIGC:
 - **垫话引擎**：慢脑 LLM 调用前**同步返回反应性垫话占位**（`player_says` 结果含 `filler` 字段）——脾气掩码（chen 暴躁/lily 喜悦等 3 掩码先行）× 8D 当下状态双驱动：铁匠陈压力过载时垫话带烦躁语气（"（皱眉）找老夫何事？"）、心情好时是常态反应，同一 NPC 不同状态下开场白可感知分叉；0-token 本地计算不进 LLM prompt，T2 落地 8 脾气掩码后替换标准掩码表
 - **快脑分流（T3 原型）**：`engine/fast_brain.py` 五意图（greet 招呼/ask_direction 问路/ask_price 问价/farewell 道别/ask_time 问时）规则匹配，命中直接产出 SPEAK Action **0-token 秒回**（跳过慢脑 LLM 决策链）；`player_says` 返回 `brain` 字段（fast/slow）标注分流路径，`fast_brain_stats` 接管率统计（`status()` 含 `fast_brain` 字段），`scripts/fast_brain_takeover.py` 一键实测接管率（12 条混合对话口径，对抗升级验收线 ≥50%）
 - **小村庄世界**：地点按"店铺/公共空间/居所"三类组织为可探索结构（`configs/locations.json` 配置化，内置默认 17 地点），NPC 扩至 10 个且全部配置化（各有居所/作息/职业/社会关系），作息表驱动 NPC 在居所与工作地间按时间移动（核心+背景 NPC 均参与）；新增以背景 NPC 为主（零 LLM），核心 NPC 仍跑完整决策链——村庄有人气但不增 token 成本
-- **Token 经济性度量与主动削减**：LLM Provider 上报每次调用的 token 用量（`last_usage`：prompt/completion/total_tokens），`NPCEngine` 按 NPC 聚合统计（`token_stats`），`status()` 暴露 token 报告字段——背景 NPC 零 LLM 以 token 数（非调用次数）可断言、可度量、可对比趋势；**上下文裁剪**：决策上下文注入的近期记忆从 6 条裁剪至 4 条（`RECENT_CONTEXT_WINDOW=4`），直接削减 prompt token，token 趋势：上下文裁剪下降 4435→4660→4553，T1 8D 基底重构后 4737（8 参数 prompt 增长，T3 快慢脑将大幅削减），seed=42 确定性可复现
+- **Token 经济性度量与主动削减**：LLM Provider 上报每次调用的 token 用量（`last_usage`：prompt/completion/total_tokens），`NPCEngine` 按 NPC 聚合统计（`token_stats`），`status()` 暴露 token 报告字段——背景 NPC 零 LLM 以 token 数（非调用次数）可断言、可度量、可对比趋势；token 趋势：上下文裁剪下降 4435→4660→4553，T1 8D 基底重构后 4737→4769（身份标签行合法增量），**T3 极简组装（<35token 规范落地）后 4501**——【此刻内心】行从 8 参数浮点文本改为 ≤4 个离散中文标签，结构性下降 268；seed=42 确定性可复现
+- **<35token 极简组装（T3 已落地）**：进慢脑 prompt 的只有 3-4 个高显著度离散中文标签（`InnerState.to_discrete_tags()`：按偏离幅度降序取 top4，全常带为"心境平稳"），阈值常量 `BAND_*` 全仓单一来源（filler.py 掩码同源），严禁浮点向量/参数表进 prompt，红线预防测试固化
 - **可靠性护栏**：动作白名单 + 状态机校验 + 内状态硬约束，LLM 输出经过验证器过滤，异常时安全回退
 - **零依赖内核**：engine 核心仅使用 Python 标准库；FastAPI 服务为可选层
 - **可视化 Demo**：自带 2D 俯视小地图 + 聊天界面的 Web 演示端
@@ -128,7 +129,7 @@ autonomous-npc-agent/
 
 - 事件经 EventBus 分发，**记忆层**（短期/长期/事件驱动直写）、**内状态层**（8D 正交心智基底 + 规则引擎 + 荀子六情映射 + 标签）、**关系网络层**（好感值 → 【人际关系】注入）并行消费
 - **背景 NPC 层**独立于决策层：EventBus 订阅 → 规则反应 → npc_action 事件回流，全程零 LLM 调用
-- 决策层混合决策：状态机与内状态管**硬规则**，LLM 管**柔性表达**；上下文注入【此刻内心】【周围的人】(nearby+外观)【人际关系】三块
+- 决策层混合决策：状态机与内状态管**硬规则**，LLM 管**柔性表达**；上下文注入【此刻内心】（8D 离散标签，≤4 个）【周围的人】(nearby+外观)【人际关系】三块
 - **外观链路**：set_appearance → appearance_change 事件 → NPC 感知 → snapshot nearby 携带外观 → 决策上下文
 - **村庄结构**：Location.category 三类（shop 店铺 / public 公共 / residence 居所），configs/locations.json 配置化加载
 - 行动层白名单校验后执行，新事件回流总线，形成**世界闭环**

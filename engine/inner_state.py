@@ -7,6 +7,10 @@
   * 3D PAD 心境：e_P（愉悦）/ e_A（唤醒）/ e_D（支配）
   * 1D 压力负荷：S_stress
   值域 [0, 1]，apply_delta 自动 clamp。
+- to_discrete_tags() 把 8D 映射为 ≤4 个高显著度离散中文标签
+  （阈值常量 BAND_* 是全仓单一来源，filler.py 掩码同源引用），
+  是决策上下文消费 8D 的唯一通道——进慢脑 prompt 的只有离散
+  标签，浮点向量/参数表严禁注入（<35token 极简组装规范）。
 - 荀子六情（好、恶、喜、怒、哀、乐）映射为 PAD 增量矢量，
   是"情 → 心境"的确定性通道：XUNZI_EMOTION_VECTORS。
 - 亲缘度（affinity）不属于心智基底：它由关系网络
@@ -17,21 +21,44 @@
 
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 
 if TYPE_CHECKING:
     from .world import WorldEvent
 
-PARAM_NAMES = {
-    "p_fatigue": "疲劳",
-    "p_hunger": "饥饿",
-    "p_pain": "痛感",
-    "p_drive": "驱力",
-    "e_P": "愉悦",
-    "e_A": "唤醒",
-    "e_D": "支配",
-    "S_stress": "压力",
-}
+# --------------------------------------------------------------------------- #
+# 离散状态带阈值（单一来源，<35token 极简 Prompt 组装规范）
+# --------------------------------------------------------------------------- #
+# 进慢脑（LLM 决策链）prompt 的只有 3-4 个高显著度离散中文标签，
+# 严禁注入浮点向量/完整参数表。本组常量是全仓状态带阈值的唯一权威：
+# engine/filler.py 脾气掩码的状态带同源引用（消除"同一心理现象
+# 两套阈值"的共线性），数值与掩码既有阈值严格一致（行为零变化）。
+# p_hunger / p_pain 两条带为本批新增（掩码未消费，是决策上下文
+# 离散标签新增的显著带）；p_pain 阈值 0.5 低于生理稳态高带 0.7——
+# 痛感对行为显著性更高（"断指"缺陷的状态传导通道）。
+BAND_STRESS_HIGH = 0.6      # S_stress > 0.6 → 心烦意乱
+BAND_AROUSAL_HIGH = 0.7     # e_A > 0.7 → 情绪激动
+BAND_PLEASURE_HIGH = 0.7    # e_P > 0.7 → 心情愉悦
+BAND_PLEASURE_LOW = 0.4     # e_P < 0.4 → 情绪低落
+BAND_DOMINANCE_HIGH = 0.7   # e_D > 0.7 → 盛气凌人
+BAND_FATIGUE_HIGH = 0.7     # p_fatigue > 0.7 → 疲惫不堪
+BAND_HUNGER_HIGH = 0.7      # p_hunger > 0.7 → 饥肠辘辘
+BAND_PAIN_HIGH = 0.5        # p_pain > 0.5 → 旧伤作痛
+
+# 8D → 离散中文标签映射表：(参数, 方向, 阈值, 标签)。
+# 方向 ">"：value > 阈值命中，偏离幅度 = value - 阈值；
+# 方向 "<"：value < 阈值命中，偏离幅度 = 阈值 - value。
+# e_P 的两条带天然互斥（一个值不可能同时 >0.7 且 <0.4）。
+DISCRETE_BANDS = (
+    ("S_stress", ">", BAND_STRESS_HIGH, "心烦意乱"),
+    ("e_A", ">", BAND_AROUSAL_HIGH, "情绪激动"),
+    ("e_P", ">", BAND_PLEASURE_HIGH, "心情愉悦"),
+    ("e_P", "<", BAND_PLEASURE_LOW, "情绪低落"),
+    ("e_D", ">", BAND_DOMINANCE_HIGH, "盛气凌人"),
+    ("p_fatigue", ">", BAND_FATIGUE_HIGH, "疲惫不堪"),
+    ("p_hunger", ">", BAND_HUNGER_HIGH, "饥肠辘辘"),
+    ("p_pain", ">", BAND_PAIN_HIGH, "旧伤作痛"),
+)
 
 PRAISE_KEYWORDS = ("好", "厉害", "棒", "了不起", "手艺", "牛", "真行")
 CRITICISM_KEYWORDS = ("不对", "不好", "差", "烂", "质疑", "垃圾", "假")
@@ -90,9 +117,29 @@ class InnerState:
         """序列化为字典（8 键），值保留 4 位小数。"""
         return {p: round(getattr(self, p), 4) for p in self.PARAMS}
 
-    def to_prompt_text(self) -> str:
-        """生成注入决策上下文的中文文本（8 参数，"名: 值"格式）。"""
-        return "，".join(f"{PARAM_NAMES[p]}: {getattr(self, p):.2f}" for p in self.PARAMS)
+    def to_discrete_tags(self) -> List[str]:
+        """8D → 显著偏离带的离散中文标签（<35token 极简组装唯一口径）。
+
+        - 只输出显著偏离带的项（带内微差不注入 prompt）；
+        - 按偏离幅度降序取 top 4（幅度并列时保持 DISCRETE_BANDS
+          定义序，排序稳定、输出确定）；
+        - 全常带返回 ["心境平稳"]（单标签保持【此刻内心】行存在）。
+        本方法是决策上下文消费 8D 的唯一通道：旧 8 参数浮点文本
+        方法（"名: 值"格式，约 71 字符）已按无双轨纪律删除，
+        严禁浮点数字进入慢脑 prompt。
+        """
+        hits = []
+        for param, direction, threshold, label in DISCRETE_BANDS:
+            value = getattr(self, param)
+            if direction == ">":
+                if value > threshold:
+                    hits.append((value - threshold, label))
+            elif value < threshold:
+                hits.append((threshold - value, label))
+        if not hits:
+            return ["心境平稳"]
+        hits.sort(key=lambda item: item[0], reverse=True)
+        return [label for _, label in hits[:4]]
 
 
 class StateUpdater:

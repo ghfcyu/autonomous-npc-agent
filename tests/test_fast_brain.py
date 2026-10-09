@@ -12,6 +12,9 @@
 7. 快脑 SPEAK 回流：npc_action 事件 + TALKING 状态（与慢脑一致）
 8. SLEEPING 不拦截（走慢脑梦呓路径）；确定性：同输入两次全等
 9. 世界消费实证：问路回复含真实地点名、报时含 world.clock
+10. 查价语义对齐（第九次审查指令 1）：问什么答什么——问铁锤答铁锤、
+    问铁锤不得答铁剑（审查点名反例锁）；越界/未知商品回通用句
+11. greet 高频口语变体（你好呀/你好啊）：快脑秒回且 0-token
 """
 
 import sys
@@ -23,7 +26,8 @@ import unittest
 
 from engine.actions import ActionType
 from engine.engine import NPCEngine
-from engine.fast_brain import (FAST_REPLY_TONES, INTENT_RULES, FastBrain)
+from engine.fast_brain import (FAST_REPLY_TONES, INTENT_RULES, FastBrain,
+                                _DEFAULT_PRICE)
 from engine.llm.mock import MockLLMProvider
 from engine.npc import Persona
 from engine.states import NPCState
@@ -36,7 +40,7 @@ TOKEN_BASELINE_SENTENCES = (
 
 # 各意图正例样本（respond 命中的输入 → intent_id）
 POSITIVE_SAMPLES = {
-    "greet": ("你好", "晚上好", "喂"),
+    "greet": ("你好", "你好呀", "你好啊", "晚上好", "喂"),
     "ask_direction": ("铁匠铺怎么走", "水井边在哪", "请问面包铺在哪里"),
     "ask_price": ("这个多少钱", "贵不贵", "剑要多少钱"),
     "farewell": ("再见", "我走了"),
@@ -149,9 +153,11 @@ class TestConservativeMiss(unittest.TestCase):
         self._miss("你好，听说你是这条街上手艺最好的铁匠？")
 
     def test_extended_greeting_misses(self):
-        """「你好呀」带语气扩展、整句非问候语 → 慢脑（保守回归保护，
-        既有 test_background_npc 的 LLM 调用链路不得被快脑截胡）。"""
-        self._miss("你好呀")
+        """不入表问候变体（「你好哇」整句非全等短语）→ 慢脑。第九次
+        审查指令 1 裁定「你好呀/你好啊」等高频口语变体入表快脑秒回
+        （原「带语气助词保守走慢脑」口径被推翻）；本用例锁剩下的
+        保守边界——表外变体仍走慢脑，防子串误伤。"""
+        self._miss("你好哇")
 
     def test_long_price_misses(self):
         """含问价关键词但句长超限（>8 字）→ 慢脑。"""
@@ -222,6 +228,21 @@ class TestZeroToken(unittest.TestCase):
         # 不读 last_usage 残留值、不累计、calls 不 +1）
         self.assertEqual(engine.token_stats["chen"], stats_before,
                          "快脑命中污染了 token_stats（读到慢脑残留 usage）")
+
+    def test_greet_variants_fast_zero_token(self):
+        """第九次审查指令 1：「你好呀/你好啊」走快脑秒回且 0-token
+        （brain == "fast"，mock.call_count 与全局 token 统计均不增）。"""
+        engine = make_chen_engine("irritable")
+        calls_before = engine.llm.call_count
+        status_before = engine.status()["token_stats"]
+        for text in ("你好呀", "你好啊"):
+            result = engine.player_says(text, "chen")
+            self.assertEqual(result["brain"], "fast",
+                             f"「{text}」应走快脑秒回（高频口语变体入表）")
+        self.assertEqual(engine.llm.call_count, calls_before,
+                         "greet 变体快脑秒回不得产生 LLM 调用")
+        self.assertEqual(engine.status()["token_stats"], status_before,
+                         "greet 变体快脑秒回污染了全局 token 统计")
 
     def test_fast_only_npc_absent_from_token_stats(self):
         """纯快脑对话的 NPC 不进 token_stats（0-token 不聚合）。"""
@@ -437,10 +458,65 @@ class TestDeterminismAndWorldConsumption(unittest.TestCase):
                       "报时回复未消费 world.clock")
 
     def test_price_reply_uses_persona_role(self):
-        """查价回复按职业给确定性报价（blacksmith 走铁匠报价句）。"""
-        action = self.npc.fast_brain.respond("这个多少钱", self.npc, self.world)
+        """查价回复消费 persona.role 经营范围：blacksmith 问铁剑得铁剑
+        报价；同问句换经营范围外职业（villager）→ 回通用句——role
+        真实参与报价决策（白名单 _ROLE_GOODS）。"""
+        action = self.npc.fast_brain.respond("铁剑多少钱", self.npc, self.world)
         self.assertIn("铁剑", action.payload["text"],
-                      "查价回复未按 blacksmith 职业报价")
+                      "查价回复未按 blacksmith 经营范围报价")
+        self.npc.persona.role = "villager"  # 经营范围外职业
+        action = self.npc.fast_brain.respond("铁剑多少钱", self.npc, self.world)
+        self.assertNotIn("铁剑", action.payload["text"],
+                         "换职业仍报铁剑价——persona.role 未被消费")
+
+
+class TestPriceSemanticAlignment(unittest.TestCase):
+    """查价语义对齐（第九次审查指令 1）：问什么答什么，严禁答非所问。
+
+    审查实测缺陷：问「铁锤多少钱」答「铁剑十两银子」——role-keyed
+    旧表把职业默认报价顶在任意问价句上。本组用例锁新语义：
+    商品词对齐经营范围报价，无法对齐一律回通用句。
+    """
+
+    def setUp(self):
+        self.engine = make_chen_engine("irritable")  # chen = blacksmith
+        self.npc = self.engine.npcs["chen"]
+        self.world = self.engine.world
+
+    def _price_reply(self, text: str) -> str:
+        """断言命中 ask_price 意图并返回回复文本（玩家可感知口径）。"""
+        action = self.npc.fast_brain.respond(text, self.npc, self.world)
+        self.assertIsNotNone(action, f"「{text}」应命中 ask_price")
+        self.assertEqual(action.payload["intent"], "ask_price")
+        return action.payload["text"]
+
+    def test_ask_sword_gets_sword_price(self):
+        """正例：问「铁剑多少钱」→ 回答含「铁剑」（问什么答什么）。"""
+        self.assertIn("铁剑", self._price_reply("铁剑多少钱"))
+
+    def test_ask_hammer_gets_hammer_price(self):
+        """正例：问「铁锤多少钱」→ 回答含「铁锤」（不再是职业默认报价）。"""
+        self.assertIn("铁锤", self._price_reply("铁锤多少钱"))
+
+    def test_ask_hammer_never_answers_sword(self):
+        """反例锁（审查点名）：问「铁锤多少钱」→ 回答不得含「铁剑」
+        （问铁锤不得答铁剑——答非所问）。"""
+        self.assertNotIn("铁剑", self._price_reply("铁锤多少钱"),
+                         "问铁锤答铁剑——答非所问缺陷回归")
+
+    def test_out_of_scope_goods_gets_default(self):
+        """越界反例：问 chen「皮甲多少钱」（铁匠不卖皮甲）→ 回通用句，
+        不得报皮甲价（经营范围白名单）。语气前缀另属掩码层，不在此锁。"""
+        reply = self._price_reply("皮甲多少钱")
+        self.assertIn(_DEFAULT_PRICE, reply,
+                     "越界商品应回通用句，不得报经营范围外商品价")
+        self.assertNotIn("皮甲", reply, "铁匠不卖皮甲，不得报皮甲价")
+
+    def test_unknown_goods_gets_default(self):
+        """未知商品反例：问「锄头多少钱」（商品词不在报价表）→ 回通用句
+        （语气前缀属掩码层，不在此锁）。"""
+        self.assertIn(_DEFAULT_PRICE, self._price_reply("锄头多少钱"),
+                      "未知商品应回通用句，不得报职业默认报价")
 
 
 if __name__ == "__main__":

@@ -1,21 +1,26 @@
 """T1 验收测试：8D 正交心智基底 + 荀子六情映射 + 亲缘度迁移关系网。
 
 覆盖八块契约：
-1. InnerState 数据类：8D 默认值、clamp、序列化、提示词文本
+1. InnerState 数据类：8D 默认值、clamp、序列化、离散标签
+   （8D 状态带离散化，2026-10-10：旧 8 参数浮点文本方法已删，
+   【此刻内心】行改消费 to_discrete_tags 离散标签口径）
 2. StateUpdater · item_given：送礼 → 六情"好"矢量 + 亲缘度写入关系网
 3. StateUpdater · player_spoke：赞美"喜"/批评"怒" + 较为自负标签放大
 4. DecisionEngine 提示词：8D inner_state 与 tags 进入决策上下文
+   （inner_state 以 ≤4 个离散中文标签进入，无浮点）
 5. DecisionEngine 硬约束：S_stress 过高 / p_fatigue 过高 → REFUSE
 6. StateUpdater · time_passed：疲劳随时间变化（睡觉恢复、清醒累积）
 7. StateUpdater · npc_action：行动消耗疲劳
 8. NPCEngine.player_gives 防御：G1 遗留修复——给玩家送礼被拒
+9. <35token 红线预防：【此刻内心】行无浮点、标签 ≤4、全常带单标签
 """
 
+import re
 import unittest
 
 from engine.actions import ActionType
 from engine.engine import NPCEngine
-from engine.inner_state import InnerState, PARAM_NAMES
+from engine.inner_state import InnerState
 from engine.llm.mock import MockLLMProvider
 from engine.npc import Persona
 from engine.states import NPCState
@@ -93,12 +98,40 @@ class TestInnerState(unittest.TestCase):
         s.apply_delta("S_stress", 1.0)
         self.assertAlmostEqual(s.S_stress, 1.0)
 
-    def test_to_prompt_text(self):
-        """to_prompt_text 返回包含所有 8 个参数中文名的字符串。"""
-        s = InnerState()
-        text = s.to_prompt_text()
-        for cn_name in PARAM_NAMES.values():
-            self.assertIn(cn_name, text)
+    def test_to_discrete_tags_significant(self):
+        """to_discrete_tags：显著偏离带 → 对应离散标签，按偏离幅度降序。
+
+        功能变更（8D 状态带离散化，2026-10-10）：旧断言 8 参数
+        中文浮点文本，随旧浮点文本方法删除失效，
+        改写为离散标签口径。"""
+        s = InnerState(S_stress=0.85, p_fatigue=0.9)
+        # 偏离幅度：心烦意乱 0.85-0.6=0.25 > 疲惫不堪 0.9-0.7=0.20 → 降序
+        self.assertEqual(s.to_discrete_tags(), ["心烦意乱", "疲惫不堪"])
+
+    def test_to_discrete_tags_all_normal(self):
+        """to_discrete_tags：全常带返回单标签 ["心境平稳"]（保持行存在）。"""
+        self.assertEqual(InnerState().to_discrete_tags(), ["心境平稳"])
+
+    def test_to_discrete_tags_band_boundary(self):
+        """带边界锁：恰好等于阈值不命中（严格 >/<，与掩码口径一致）。"""
+        self.assertEqual(InnerState(S_stress=0.6).to_discrete_tags(),
+                         ["心境平稳"])        # 0.6 不> 0.6
+        self.assertIn("心烦意乱",
+                      InnerState(S_stress=0.61).to_discrete_tags())
+        self.assertEqual(InnerState(e_P=0.4).to_discrete_tags(),
+                         ["心境平稳"])        # 0.4 不< 0.4
+        self.assertIn("情绪低落", InnerState(e_P=0.39).to_discrete_tags())
+
+    def test_to_discrete_tags_top4_cap(self):
+        """top-4 锁：7 带全命中也截断到 4 个，按偏离幅度降序。"""
+        s = InnerState(S_stress=0.95, e_A=0.95, e_P=0.95, e_D=0.95,
+                       p_fatigue=0.95, p_hunger=0.95, p_pain=0.95)
+        tags = s.to_discrete_tags()
+        self.assertEqual(len(tags), 4)
+        # 偏离幅度：旧伤作痛 0.95-0.5=0.45 > 心烦意乱 0.95-0.6=0.35
+        # > 其余并列 0.25（并列时保持 DISCRETE_BANDS 定义序，e_A 领先）
+        self.assertEqual(tags[:2], ["旧伤作痛", "心烦意乱"])
+        self.assertEqual(tags[2], "情绪激动")
 
     def test_to_dict(self):
         """to_dict 返回 8 个键，值为 float。"""
@@ -192,7 +225,11 @@ class TestStateInPrompt(unittest.TestCase):
     """8D inner_state 与 tags 进入决策提示词。"""
 
     def test_user_prompt_contains_state(self):
-        """_user_prompt 传入 inner_state 后包含"此刻内心"和 8D 参数名与值。"""
+        """_user_prompt 传入 inner_state 后【此刻内心】行只含离散标签。
+
+        功能变更（8D 状态带离散化，2026-10-10）：旧断言"含参数名'唤醒'
+        与浮点'0.77'"随旧浮点文本方法删除失效，改写为离散标签口径
+        （显著标签名在、浮点与旧参数名不在）。"""
         npc, world, _ = _make_npc()
         npc.inner_state.e_A = 0.77
         memory_ctx = npc.memory.context_for("你好")
@@ -200,8 +237,9 @@ class TestStateInPrompt(unittest.TestCase):
         prompt = npc.decision._user_prompt(
             "你好", world, memory_ctx, snapshot, npc.inner_state)
         self.assertIn("此刻内心", prompt)
-        self.assertIn("唤醒", prompt)
-        self.assertIn("0.77", prompt)
+        self.assertIn("情绪激动", prompt)   # e_A=0.77 > 0.7 → 显著标签
+        self.assertNotIn("0.77", prompt)    # 严禁浮点进入该行
+        self.assertNotIn("唤醒", prompt)     # 旧参数名口径不复存在
 
     def test_system_prompt_contains_tags(self):
         """_system_prompt 在有 tags 时包含"性格标签"及标签名和值。"""
@@ -301,6 +339,57 @@ class TestPlayerGivesDefense(unittest.TestCase):
         result = engine.player_gives("player", "苹果")
         self.assertFalse(result["ok"])
         self.assertEqual(result["reason"], "unknown npc")
+
+
+# ============================================================================ #
+# 9. <35token 红线预防：【此刻内心】行离散化纪律（8D 状态带离散化，
+#    2026-10-10 追加）
+# ============================================================================ #
+
+class TestPromptTokenRedline(unittest.TestCase):
+    """<35token 红线预防：决策上下文【此刻内心】行只消费离散标签。
+
+    (a) 显著状态下【此刻内心】行无浮点（正则 \\d\\.\\d 零匹配）；
+    (b) 离散标签数 ≤4（7 带全命中也截断）；
+    (c) 全常带时行内含"心境平稳"且无其他标签。
+    """
+
+    @staticmethod
+    def _inner_line(**overrides):
+        """构造 NPC 并按 overrides 预置 8D 后，提取【此刻内心】行内容。"""
+        npc, world, _ = _make_npc()
+        for key, value in overrides.items():
+            setattr(npc.inner_state, key, value)
+        memory_ctx = npc.memory.context_for("你好")
+        snapshot = world.snapshot("chen")
+        prompt = npc.decision._user_prompt(
+            "你好", world, memory_ctx, snapshot, npc.inner_state)
+        match = re.search(r"【此刻内心】(.+)", prompt)
+        assert match is not None, "【此刻内心】行缺失"
+        return match.group(1)
+
+    def test_redline_no_float_in_inner_line(self):
+        """(a) 显著状态下【此刻内心】行正则 \\d\\.\\d 零匹配。"""
+        line = self._inner_line(S_stress=0.85, e_A=0.9, e_P=0.9,
+                                e_D=0.9, p_fatigue=0.9, p_hunger=0.9,
+                                p_pain=0.9)
+        self.assertIsNone(re.search(r"\d\.\d", line),
+                          msg=f"浮点泄漏进【此刻内心】行: {line}")
+
+    def test_redline_tag_count_le_4(self):
+        """(b) 7 带全命中，【此刻内心】行离散标签数 ≤4（顿号分隔计）。"""
+        line = self._inner_line(S_stress=0.95, e_A=0.95, e_P=0.95,
+                                e_D=0.95, p_fatigue=0.95, p_hunger=0.95,
+                                p_pain=0.95)
+        tags = line.split("、")
+        self.assertLessEqual(len(tags), 4,
+                             msg=f"离散标签数 {len(tags)} 超限: {line}")
+
+    def test_redline_calm_single_tag_when_normal(self):
+        """(c) 全常带时【此刻内心】行含"心境平稳"且无其他标签。"""
+        line = self._inner_line()
+        self.assertIn("心境平稳", line)
+        self.assertEqual(line.split("、"), ["心境平稳"])
 
 
 if __name__ == "__main__":

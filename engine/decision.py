@@ -88,7 +88,9 @@ class DecisionEngine:
         recent = "\n".join(f"- {m}" for m in memory_ctx.get("recent", [])) or "（无）"
         state_line = ""
         if inner_state is not None:
-            state_line = f"【此刻内心】{inner_state.to_prompt_text()}\n"
+            # <35token 极简组装：只注入 ≤4 个高显著度离散中文标签
+            # （顿号连接），严禁浮点数字/参数表出现在该行。
+            state_line = f"【此刻内心】{'、'.join(inner_state.to_discrete_tags())}\n"
         # 周围的人：同地点可见的实体及其外观（空 nearby 不注入，控 token）
         nearby_line = ""
         if snapshot.get("nearby"):

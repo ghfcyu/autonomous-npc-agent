@@ -50,12 +50,12 @@ from engine.llm.mock import MockLLMProvider
 # 前 8 条快脑可接管（覆盖 5 意图全部），后 4 条复杂话题期望走慢脑。
 DIALOGUES = [
     # --- 快脑高频日常意图（期望 brain == "fast"）---
-    # 设计边界（fast_brain.py GREET_PHRASES 整句全等口径）：「你好啊/
-    # 你好呀」等带语气助词的问候一律保守走慢脑——既有测试
-    # test_background_npc.py 以「你好呀」断言 LLM 必被调用，子串匹配
-    # 会拦截该句造成既有断言语义回归，故本条用整句全等的「您好」。
+    # 边界记录（第九次审查指令 1 裁定更新）：「你好啊/你好呀」等高频
+    # 带语气助词问候已入 GREET_PHRASES 快脑秒回（原「保守走慢脑」口径
+    # 被推翻；test_background_npc.py 的对照句已改为慢脑必达复杂句），
+    # 本条由「您好」恢复为「你好啊」实测该边界。
     ("你好", "chen", "greet"),
-    ("您好", "lily", "greet"),
+    ("你好啊", "lily", "greet"),
     ("铁匠铺怎么走", "lily", "ask_direction"),
     ("多少钱", "chen", "ask_price"),
     ("这个多少钱", "lily", "ask_price"),

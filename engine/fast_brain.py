@@ -15,7 +15,7 @@
   实现三层叠加：意图内容模板（消费世界信息）× 掩码语气前缀（按 8D
   状态带选前缀，状态带口径与 filler.py 完全一致）。
 - 意图内容模板全部玩家可感知（问路给真实方向、报时给 world.clock、
-  查价按职业给确定性报价），无掩码用中性变体（向后兼容）。
+  查价按商品词对齐经营范围给报价），无掩码用中性变体（向后兼容）。
 - 回复文本 ≤40 字符（<35token 极简 Prompt 组装规范的出口约束），
   不注入浮点向量。
 - 快脑只消费既有 InnerState 8D 与脾气掩码，不新增任何心理变量系统。
@@ -55,12 +55,17 @@ def _strip(text: str) -> str:
 # ------------------------------------------------------------------ #
 
 # a) greet 打招呼：整句本身就是问候语（≤6 字）。用「整句全等」而非
-#    子串匹配——含问候词但带后续内容的句子（如「你好呀」这种带语气
-#    扩展、或「你好，听说你是……」这种长句）一律走慢脑，保守防误伤。
+#    子串匹配——含问候词但带后续内容的句子（如「你好，听说你是……」
+#    这种长句）一律走慢脑，保守防误伤。「你好呀/你好啊」等高频带
+#    语气助词的口语变体为整句全等短语，纳入快脑秒回（第九次审查
+#    指令 1 裁定，推翻此前「带语气助词问候保守走慢脑」口径）。
 GREET_PHRASES = (
-    "你好", "您好", "你们好", "大家好",
-    "早", "早啊", "早上好", "早安", "中午好", "下午好", "晚上好", "晚安",
-    "喂", "嗨", "嘿", "哈喽",
+    "你好", "你好呀", "你好啊",
+    "您好",
+    "你们好", "你们好呀",
+    "大家好", "大家好呀",
+    "早", "早啊", "早上好", "早上好啊", "早安", "中午好", "下午好", "晚上好", "晚安",
+    "喂", "嗨", "嘿", "哈喽", "哈喽啊",
 )
 
 # d) farewell 告别：整句本身就是告别语（≤6 字），同 greet 用整句全等。
@@ -174,10 +179,24 @@ def _tone_prefix(temperament_id: Optional[str],
 # 意图内容模板：消费真实世界信息，全部玩家可感知。
 # ------------------------------------------------------------------ #
 
-# 查价：按 npc.persona 职业给确定性报价句（无职业特表时走通用句）
+# 查价：商品词-keyed 报价表 + role→经营范围白名单（第九次审查指令 1
+#    重构：原 role-keyed 表不管玩家问什么都回职业默认报价，问「铁锤
+#    多少钱」答「铁剑十两」——答非所问）。语义规则：**问什么答什么**——
+#      1. 从玩家问句提取商品词（子串匹配，多商品词命中按长度降序优先）；
+#      2. 命中且属于该 NPC 经营范围 → 回该商品报价句（问铁锤答铁锤价）；
+#      3. 命中但不属经营范围（铁匠不卖皮甲）、或商品词不在表中
+#         （如「锄头」）→ 一律回 _DEFAULT_PRICE 通用句，严禁答非所问。
 _PRICE_LINES: Dict[str, str] = {
-    "blacksmith": "铁剑十两银子，好料另算。",
-    "merchant": "皮甲五两，干粮一钱。",
+    "铁剑": "铁剑十两银子，好料另算。",
+    "铁锤": "铁锤三两，包砸不卷刃。",
+    "皮甲": "皮甲五两，看料加价。",
+    "干粮": "干粮一钱一包。",
+}
+# role → 经营范围商品集合：白名单外的商品一律不得报出报价（越界走
+# 通用句），无经营范围的职业（如 villager）全部走通用句。
+_ROLE_GOODS: Dict[str, frozenset] = {
+    "blacksmith": frozenset({"铁剑", "铁锤"}),
+    "merchant": frozenset({"皮甲", "干粮"}),
 }
 _DEFAULT_PRICE = "看货定价，童叟无欺。"
 
@@ -208,8 +227,27 @@ def _content_farewell(npc: "NPC", world: "World", query: str) -> str:
     return "慢走，不送。"
 
 
+def _goods_in_text(text: str) -> Optional[str]:
+    """从玩家问句提取商品词：子串匹配，多商品词命中按长度降序优先。"""
+    for goods in sorted(_PRICE_LINES, key=len, reverse=True):
+        if goods in text:
+            return goods
+    return None
+
+
 def _content_price(npc: "NPC", world: "World", query: str) -> str:
-    return _PRICE_LINES.get(npc.persona.role, _DEFAULT_PRICE)
+    """查价回复：问什么答什么；无法对齐商品回通用句，严禁答非所问。
+
+    商品词命中且属于该 NPC 经营范围（persona.role → _ROLE_GOODS
+    白名单）→ 回对应报价句；越界商品（问铁匠「皮甲多少钱」）、
+    未知商品（「锄头多少钱」）与无商品词问句 → 一律回 _DEFAULT_PRICE
+    通用句，绝不把职业默认报价顶在任意问价句上（问铁锤答铁剑=审查
+    点名的答非所问缺陷）。
+    """
+    goods = _goods_in_text(query)
+    if goods is not None and goods in _ROLE_GOODS.get(npc.persona.role, frozenset()):
+        return _PRICE_LINES[goods]
+    return _DEFAULT_PRICE
 
 
 def _content_time(npc: "NPC", world: "World", query: str) -> str:

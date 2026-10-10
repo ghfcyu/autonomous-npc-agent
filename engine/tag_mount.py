@@ -39,7 +39,11 @@
    即调用方 bug 或标签池设计缺陷；③T4 批量生成器扩池后若池设计
    有缺陷，fail-fast 当场暴露而非静默产出无标签 NPC。
 
-零第三方依赖，仅 enum/random/dataclasses/typing 标准库。
+单一挂载内核纪律：build_genesis_ledger（文件末尾）是标签账本构建的唯一
+实现——engine 常驻化 / mount_tags 显式 API / T4 village_genesis 人口学
+生成器全部复用它，严禁任何模块复制挂载逻辑（两套挂载逻辑漂移=共线性死穴）。
+
+零第三方依赖，仅 enum/random/zlib/dataclasses/typing 标准库。
 """
 from __future__ import annotations
 
@@ -48,7 +52,9 @@ import random
 from dataclasses import dataclass, replace
 from typing import Optional
 
-from .tag_genesis import PYRAMID_TIERS, attribute_label, beauty_label
+from .tag_genesis import (PYRAMID_TIERS, InnateAttributes, attribute_label,
+                          beauty_label, deterministic_seed,
+                          generate_innate_attributes)
 
 
 class TagPhase(enum.Enum):
@@ -350,3 +356,64 @@ class TagLedger:
                 removed = True
         self._ttl.pop(tag_id, None)
         return removed
+
+
+# --------------------------------------------------------------------- #
+# 单一挂载内核（原 NPCEngine._build_tag_ledger 方法主体迁移至此，T4 第一小步）
+# --------------------------------------------------------------------- #
+def build_genesis_ledger(npc_id: str, rng: Optional[random.Random] = None,
+                         innate: Optional[InnateAttributes] = None) -> TagLedger:
+    """构建一张标签账本：mount_tags 显式 API 与 spawn 常驻化的单一内核
+    （T4 village_genesis 人口学生成器复用同一函数——两套挂载逻辑漂移=
+    共线性死穴）。
+
+    规范 5.2：非纯背景环境 NPC 强制挂载 ≥1 显性缺陷 + ≥1 绝密把柄；
+    背景 NPC 不在 self.npcs 登记（"非纯背景"语义），天然零挂载。
+    同时把 6D 先天属性称号中的高显著度档 add_innate 进账本：仅
+    attribute_label/beauty_label 的传奇档（与 10.0 端点同文案）或
+    长尾/底级档（与 1.0 端点同文案）——寻常档不注入（token 纪律），
+    档位判定用公开 API 端点探测，不复制阈值数字（正交纪律）。
+
+    称号挂载先于缺陷/把柄挂载：mount_flaw_and_secret 的互斥预检
+    依赖账本中已有的 morality_saint 等先天称号（圣人道德不与
+    暗夜杀人并存）。
+
+    rng=None 时经 tag_genesis.deterministic_seed(npc_id) 取 crc32 种子：
+    跨进程确定性（内建 hash() 受 PYTHONHASHSEED 随机化影响，不可用；
+    "同一确定性口径"单一来源，本模块不直接 import zlib）。
+
+    innate=None 时内部生成（engine 薄壳路径的既有行为）；T4
+    generate_villager 传入外部先生成的同一组先天属性，保证
+    VillagerProfile.innate 与账本挂载依据同源——传入时 rng 流
+    消费顺序与两参路径逐次一致（先 innate 采样再挂载采样），
+    确定性产物不变。
+    """
+    if rng is None:
+        rng = deterministic_seed(npc_id)
+    if innate is None:
+        innate = generate_innate_attributes(rng)
+    ledger = TagLedger()
+
+    # 6D 高显著度先天称号（beauty 走专属六档 beauty_label）
+    for attr_id in ("strength", "savvy", "courage", "morality", "alcohol_tol"):
+        label = attribute_label(attr_id, getattr(innate, attr_id))
+        if label == attribute_label(attr_id, 10.0):  # 传奇档
+            # morality 传奇档对齐互斥锁 id morality_saint（规范 6.2）
+            tag_id = ("morality_saint" if attr_id == "morality"
+                      else f"attr_{attr_id}_legendary")
+            ledger.add_innate(MountedTag(tag_id=tag_id, label=label,
+                                         phase=TagPhase.INNATE))
+        elif label == attribute_label(attr_id, 1.0):  # 长尾档
+            ledger.add_innate(MountedTag(tag_id=f"attr_{attr_id}_tail",
+                                         label=label, phase=TagPhase.INNATE))
+    beauty = beauty_label(innate.beauty)
+    if beauty == beauty_label(10.0):  # 倾国倾城，对齐互斥锁 id
+        ledger.add_innate(MountedTag(tag_id="beauty_stunning", label=beauty,
+                                     phase=TagPhase.INNATE))
+    elif beauty == beauty_label(1.0):  # 面目可怖，对齐互斥锁 id
+        ledger.add_innate(MountedTag(tag_id="beauty_horrifying", label=beauty,
+                                     phase=TagPhase.INNATE))
+
+    # 强制缺陷 + 把柄（挂载结果进 INNATE 桶，把柄不进决策上下文）
+    ledger.mount_flaw_and_secret(rng, innate=innate)
+    return ledger

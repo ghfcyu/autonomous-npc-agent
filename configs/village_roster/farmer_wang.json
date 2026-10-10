@@ -1,0 +1,19 @@
+{
+  "id": "farmer_wang",
+  "name": "王氏",
+  "role": "farmer",
+  "location_id": "plaza",
+  "summary": "赵老汉的老伴，操持家务农活一把好手",
+  "reactions": {
+    "env_event": [
+      "{npc_name}挎着菜篮从田埂上直起腰，{summary}",
+      "{npc_name}把鸡食撒得满地都是"
+    ],
+    "entity_moved": [
+      "{npc_name}抬起头看了看是谁来了"
+    ]
+  },
+  "inventory": ["菜篮", "鸡蛋"],
+  "residence": "house_zhao",
+  "schedule": {"5": "WORKING", "12": "IDLE", "19": "SLEEPING"}
+}

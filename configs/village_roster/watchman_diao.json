@@ -1,0 +1,19 @@
+{
+  "id": "watchman_diao",
+  "name": "刁更头",
+  "role": "night_watchman",
+  "location_id": "plaza",
+  "summary": "更夫，夜间巡村打更",
+  "reactions": {
+    "env_event": [
+      "{npc_name}敲着梆子，声音传得老远，{summary}",
+      "{npc_name}提着灯笼挨家看门户"
+    ],
+    "entity_moved": [
+      "{npc_name}提灯照了照来人的脸"
+    ]
+  },
+  "inventory": ["梆子", "灯笼"],
+  "residence": "house_watchman",
+  "schedule": {"20": "WORKING", "3": "SLEEPING"}
+}

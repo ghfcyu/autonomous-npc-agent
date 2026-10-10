@@ -1,0 +1,19 @@
+{
+  "id": "farmhand_sun",
+  "name": "孙小满",
+  "role": "farmhand",
+  "location_id": "plaza",
+  "summary": "赵家的雇农，借住赵家偏房，干活勤快",
+  "reactions": {
+    "env_event": [
+      "{npc_name}喂完牲口才歇口气，{summary}",
+      "{npc_name}拍了拍裤腿上的泥"
+    ],
+    "entity_moved": [
+      "{npc_name}放下手里的活计看了看"
+    ]
+  },
+  "inventory": ["镰刀", "草帽"],
+  "residence": "house_zhao",
+  "schedule": {"5": "WORKING", "12": "IDLE", "19": "SLEEPING"}
+}

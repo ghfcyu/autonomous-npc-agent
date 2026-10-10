@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import math
 import random
+import zlib
 from dataclasses import dataclass
 
 INNATE_ATTRIBUTE_SPECS = {  # attr_id → (中文名, mu, sigma)，4.3 节
@@ -94,6 +95,18 @@ def _truncated_gauss(rng: random.Random, mu: float, sigma: float) -> float:
         if lo <= value <= hi:
             return value
     return min(max(value, lo), hi)
+
+
+def deterministic_seed(key: str) -> random.Random:
+    """crc32 确定性种子 rng 工厂（"同一确定性口径"的单一来源）。
+
+    引擎常驻化（spawn）/ mount_tags 显式 API / T4 village_genesis
+    人口学生成器全部经本函数取 rng：zlib.crc32(key) 种子跨进程跨实例
+    一致（内建 hash() 受 PYTHONHASHSEED 随机化影响，不可用）。
+    tag_mount 不直接 import zlib（其测试 import 白名单较窄），经此
+    项目内依赖获取同一口径——零口径漂移。
+    """
+    return random.Random(zlib.crc32(key.encode("utf-8")))
 
 
 def generate_innate_attributes(rng: random.Random) -> InnateAttributes:

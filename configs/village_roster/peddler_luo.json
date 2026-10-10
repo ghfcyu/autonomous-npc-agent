@@ -1,0 +1,19 @@
+{
+  "id": "peddler_luo",
+  "name": "罗四方",
+  "role": "peddler",
+  "location_id": "market",
+  "summary": "货郎，担子里针头线脑样样有",
+  "reactions": {
+    "env_event": [
+      "{npc_name}摇着拨浪鼓走街串巷，{summary}",
+      "{npc_name}把担子换了换肩"
+    ],
+    "entity_moved": [
+      "{npc_name}停下步子招呼：看点啥？"
+    ]
+  },
+  "inventory": ["拨浪鼓", "针头线脑"],
+  "residence": "house_peddler",
+  "schedule": {"6": "WORKING", "12": "IDLE", "18": "SLEEPING"}
+}

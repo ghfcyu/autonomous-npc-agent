@@ -1,0 +1,19 @@
+{
+  "id": "tavern_aman",
+  "name": "阿满",
+  "role": "tavern_help",
+  "location_id": "tavern",
+  "summary": "酒馆帮工，晚班打烊晚，寄宿孙家",
+  "reactions": {
+    "env_event": [
+      "{npc_name}摞着碗筷，桌椅擦得发亮，{summary}",
+      "{npc_name}往灶膛里添了把柴"
+    ],
+    "entity_moved": [
+      "{npc_name}擦着手迎上来"
+    ]
+  },
+  "inventory": ["抹布", "灯笼"],
+  "residence": "house_sun",
+  "schedule": {"5": "WORKING", "14": "IDLE", "21": "SLEEPING"}
+}

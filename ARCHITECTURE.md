@@ -341,8 +341,9 @@ NPCEngine.tick(minutes)
 
 ### 世界层 v2：人口学村庄（T4）
 
-- 25 NPC 按 6D 正态属性 + 齐普夫职业分布 + 标签金字塔生成；关键 NPC（1-5%，8D 全量+把柄）vs 环境 NPC（4D 压缩稳态，零 LLM）
+- 25 NPC 按 6D 正态属性 + 齐普夫职业分布 + 标签金字塔生成；关键 NPC（8D 全量+把柄）vs 环境 NPC（4D 压缩稳态，零 LLM）
 - 行为经济学离散事件化（T5）：EWMA 财富基准、2.5 倍禀赋效应、损失域豪赌；杜希格习惯回路 0-token 截断
+- **第一小步已落地（2026-10-11）**：`engine/village_genesis.py` 离线人口学生成器——25 人齐普夫职业阶层花名册（farming 7 / craft 5 / 特殊职业各 ≤2）+ `generate_village()` 确定性人口学档案（crc32(npc_id) 种子）；关键 NPC 2 人（chen/lily，mind=None，8D 全量由运行时 InnerState 承载）vs 环境 NPC 23 人（`EnvMind` 4D 压缩稳态：p_fatigue/p_hunger/e_P/S_stress 字段名与 8D 严格同名——共线性纪律，常人平稳带初值，Tier 0/1 封印不进任何 prompt）；**单一挂载内核纪律**：原 `NPCEngine._build_tag_ledger` 主体提取为 `tag_mount.build_genesis_ledger`（engine 薄壳委托、签名行为零变化），引擎常驻化 / mount_tags 显式 API / village_genesis 三方复用同一函数（chen 缺陷/把柄挂载双源全等有测试锁）；15 位新住民配置落位 `configs/village_roster/`（共居消化居所增速：赵宅 3 口/药童寄宿秦家/帮工寄宿孙家/学童寄宿私塾宅；更夫 20:00-03:00 夜班作息反转、牧人 04:00 早出），生产路径暂不自动加载——待 T4-a 地点扩容（17→33，NEW_LOCATION_IDS 14 个引用清单）后正式接入运转；正态/齐普夫/金字塔三形状分布断言+环境零 LLM 双口径见 `tests/test_village_genesis.py`（40 用例）；生成器为纯离线数据层，token 基线 4501 零影响
 
 ### 架构图重画硬清单（T3 执行，2026-10-07 固化；2026-10-10 22:00 已重画完成）
 

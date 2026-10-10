@@ -1,0 +1,19 @@
+{
+  "id": "widow_yi",
+  "name": "易婆婆",
+  "role": "widow",
+  "location_id": "shrine",
+  "summary": "孤寡老人，靠村人接济过活",
+  "reactions": {
+    "env_event": [
+      "{npc_name}坐在祠堂门槛上晒暖，{summary}",
+      "{npc_name}眯着眼，手里佛珠慢慢捻"
+    ],
+    "entity_moved": [
+      "{npc_name}眯眼认了认来人"
+    ]
+  },
+  "inventory": ["佛珠", "针线"],
+  "residence": "house_yi",
+  "schedule": {"7": "IDLE", "19": "SLEEPING"}
+}

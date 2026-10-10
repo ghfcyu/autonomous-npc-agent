@@ -1,0 +1,19 @@
+{
+  "id": "carpenter_lu",
+  "name": "鲁一刀",
+  "role": "carpenter",
+  "location_id": "carpentry",
+  "summary": "木匠，手艺精细话不多",
+  "reactions": {
+    "env_event": [
+      "{npc_name}眯眼吊线，斧子落得又稳又准，{summary}",
+      "{npc_name}刨出卷卷木花"
+    ],
+    "entity_moved": [
+      "{npc_name}停下手里的活看了一眼"
+    ]
+  },
+  "inventory": ["刨子", "墨斗"],
+  "residence": "house_carpenter",
+  "schedule": {"6": "WORKING", "12": "IDLE", "19": "SLEEPING"}
+}

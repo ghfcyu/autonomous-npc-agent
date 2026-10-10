@@ -1,0 +1,19 @@
+{
+  "id": "herb_boy",
+  "name": "小蓟",
+  "role": "herb_apprentice",
+  "location_id": "clinic",
+  "summary": "药童，拜在大夫秦家门下寄宿学艺",
+  "reactions": {
+    "env_event": [
+      "{npc_name}把晾好的药材分门别类，{summary}",
+      "{npc_name}背着药篓跟在师父身后"
+    ],
+    "entity_moved": [
+      "{npc_name}好奇地张望来人"
+    ]
+  },
+  "inventory": ["药篓", "甘草"],
+  "residence": "house_qin",
+  "schedule": {"6": "WORKING", "12": "IDLE", "20": "SLEEPING"}
+}

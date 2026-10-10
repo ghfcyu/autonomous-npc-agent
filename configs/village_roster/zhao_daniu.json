@@ -1,0 +1,19 @@
+{
+  "id": "zhao_daniu",
+  "name": "赵大牛",
+  "role": "farmer",
+  "location_id": "plaza",
+  "summary": "赵家独子，种地是一把好手",
+  "reactions": {
+    "env_event": [
+      "{npc_name}扛着锄头往田里去，{summary}",
+      "{npc_name}抹了把汗，接着侍弄庄稼"
+    ],
+    "entity_moved": [
+      "{npc_name}直起腰来打了个照面"
+    ]
+  },
+  "inventory": ["锄头", "麦种"],
+  "residence": "house_zhao",
+  "schedule": {"5": "WORKING", "12": "IDLE", "19": "SLEEPING"}
+}

@@ -1,0 +1,19 @@
+{
+  "id": "herder_ma",
+  "name": "马二叔",
+  "role": "herder",
+  "location_id": "pasture",
+  "summary": "村里的牧人，天不亮就赶羊上牧场",
+  "reactions": {
+    "env_event": [
+      "{npc_name}甩了个响鞭，{summary}",
+      "{npc_name}数着羊，一只不少"
+    ],
+    "entity_moved": [
+      "{npc_name}扬了扬鞭子算是打了招呼"
+    ]
+  },
+  "inventory": ["牧鞭", "水囊"],
+  "residence": "house_herder",
+  "schedule": {"4": "WORKING", "12": "IDLE", "19": "SLEEPING"}
+}

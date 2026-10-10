@@ -1,0 +1,19 @@
+{
+  "id": "master_wen",
+  "name": "文先生",
+  "role": "schoolmaster",
+  "location_id": "school",
+  "summary": "私塾先生，教书育人",
+  "reactions": {
+    "env_event": [
+      "{npc_name}执卷踱步，书声琅琅，{summary}",
+      "{npc_name}把学生的字帖圈圈点点"
+    ],
+    "entity_moved": [
+      "{npc_name}放下书卷望了过来"
+    ]
+  },
+  "inventory": ["书卷", "戒尺"],
+  "residence": "house_school",
+  "schedule": {"6": "WORKING", "12": "IDLE", "20": "SLEEPING"}
+}

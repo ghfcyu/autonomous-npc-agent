@@ -1,0 +1,19 @@
+{
+  "id": "cao_widow",
+  "name": "曹寡妇",
+  "role": "farmer",
+  "location_id": "plaza",
+  "summary": "独自过活，田里活不落人后",
+  "reactions": {
+    "env_event": [
+      "{npc_name}低头搓着草绳，{summary}",
+      "{npc_name}把院里的柴火码得整整齐齐"
+    ],
+    "entity_moved": [
+      "{npc_name}朝来人点了点头"
+    ]
+  },
+  "inventory": ["草绳", "柴火"],
+  "residence": "house_cao",
+  "schedule": {"5": "WORKING", "12": "IDLE", "19": "SLEEPING"}
+}

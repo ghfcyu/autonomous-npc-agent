@@ -1,0 +1,19 @@
+{
+  "id": "boy_shitou",
+  "name": "小石头",
+  "role": "student",
+  "location_id": "school",
+  "summary": "学童，寄宿先生家，念书用功",
+  "reactions": {
+    "env_event": [
+      "{npc_name}先生教的字还没写完，{summary}",
+      "{npc_name}摇头晃脑背着课文"
+    ],
+    "entity_moved": [
+      "{npc_name}探头看是谁来了"
+    ]
+  },
+  "inventory": ["字帖", "毛笔"],
+  "residence": "house_school",
+  "schedule": {"6": "WORKING", "15": "IDLE", "20": "SLEEPING"}
+}

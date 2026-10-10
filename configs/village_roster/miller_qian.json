@@ -1,0 +1,19 @@
+{
+  "id": "miller_qian",
+  "name": "钱多福",
+  "role": "miller",
+  "location_id": "mill",
+  "summary": "磨坊主，村民送谷都找他",
+  "reactions": {
+    "env_event": [
+      "{npc_name}拍了拍磨盘，接着筛面，{summary}",
+      "{npc_name}哼着号子推磨"
+    ],
+    "entity_moved": [
+      "{npc_name}从磨坊里探出头来"
+    ]
+  },
+  "inventory": ["面粉", "筛子"],
+  "residence": "house_miller",
+  "schedule": {"5": "WORKING", "12": "IDLE", "19": "SLEEPING"}
+}

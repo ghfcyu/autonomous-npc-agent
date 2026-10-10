@@ -1,0 +1,19 @@
+{
+  "id": "cobbler_jia",
+  "name": "贾三针",
+  "role": "cobbler",
+  "location_id": "carpentry",
+  "summary": "修鞋匠，和木匠同坊支摊，补鞋又快又结实",
+  "reactions": {
+    "env_event": [
+      "{npc_name}捏着锥子纳鞋底，{summary}",
+      "{npc_name}咬断线头，鞋底又纳密一层"
+    ],
+    "entity_moved": [
+      "{npc_name}抬眼瞧了瞧是谁来了"
+    ]
+  },
+  "inventory": ["锥子", "麻线"],
+  "residence": "house_cobbler",
+  "schedule": {"6": "WORKING", "12": "IDLE", "19": "SLEEPING"}
+}

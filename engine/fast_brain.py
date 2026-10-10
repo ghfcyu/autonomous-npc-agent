@@ -2,8 +2,9 @@
 
 设计要点
 --------
-- 快慢脑分工：高频、句式封闭的日常意图（打招呼/问路/查价/告别/报时）
-  由本引擎纯规则秒回，构造 SPEAK Action 直接执行——**0 次 LLM 调用**；
+- 快慢脑分工：高频、句式封闭的日常意图（打招呼/确认在场/问路/查价/
+  告别/报时）由本引擎纯规则秒回，构造 SPEAK Action 直接执行——
+  **0 次 LLM 调用**；
   未命中一律落回慢脑（决策层 LLM），既有行为零变化（纯旁路向后兼容）。
 - 匹配必须保守：全部意图都带句长上限闸门，且用「整句全匹配/句尾锚定」
   而非裸子串——句子长或含复杂内容一律不命中，防误伤复杂对话走慢脑。
@@ -15,7 +16,8 @@
   实现三层叠加：意图内容模板（消费世界信息）× 掩码语气前缀（按 8D
   状态带选前缀，状态带口径与 filler.py 完全一致）。
 - 意图内容模板全部玩家可感知（问路给真实方向、报时给 world.clock、
-  查价按商品词对齐经营范围给报价），无掩码用中性变体（向后兼容）。
+  查价按商品词对齐经营范围给报价、presence 确认在场答「在，何事？」），
+  无掩码用中性变体（向后兼容）。
 - 回复文本 ≤40 字符（<35token 极简 Prompt 组装规范的出口约束），
   不注入浮点向量。
 - 快脑只消费既有 InnerState 8D 与脾气掩码，不新增任何心理变量系统。
@@ -50,7 +52,7 @@ def _strip(text: str) -> str:
 # ------------------------------------------------------------------ #
 # 意图规则表（模块级常量，风格对齐 filler.py 的 TEMPERAMENT_MASKS）
 #
-# 五条规则 = (intent_id, 句长上限, 匹配函数)。匹配函数接收清洗后的
+# 六条规则 = (intent_id, 句长上限, 匹配函数)。匹配函数接收清洗后的
 # 玩家整句与 world，命中返回 True；按表顺序取首个命中。
 # ------------------------------------------------------------------ #
 
@@ -66,6 +68,17 @@ GREET_PHRASES = (
     "大家好", "大家好呀",
     "早", "早啊", "早上好", "早上好啊", "早安", "中午好", "下午好", "晚上好", "晚安",
     "喂", "嗨", "嘿", "哈喽", "哈喽啊",
+)
+
+# f) presence 确认在场：整句本身就是「在吗」类高频封闭问句（≤6 字），
+#    同 greet 用整句全等。2026-10-10 22:00 PM 裁定扩充：非固化采样
+#    （scripts/fast_brain_takeover_open.py 13 条）暴露快脑覆盖缺口
+#    ——「老板在吗/在吗/有人吗/请问有人在吗」4 条 GAP 候选全走慢脑，
+#    每条白付一次约 1200 prompt token 的 LLM 调用只为回一个「在」字；
+#    presence 是高频封闭的「确认在场」句式，扩充进快脑秒回是数据
+#    驱动的核心体验交付（快脑是 T3 主战场），非防御性数字修补。
+PRESENCE_PHRASES = (
+    "在吗", "有人吗", "老板在吗", "请问有人在吗", "你在吗", "师父在吗",
 )
 
 # d) farewell 告别：整句本身就是告别语（≤6 字），同 greet 用整句全等。
@@ -102,6 +115,10 @@ def _match_greet(text: str, world: "World") -> bool:
     return text in GREET_PHRASES
 
 
+def _match_presence(text: str, world: "World") -> bool:
+    return text in PRESENCE_PHRASES
+
+
 def _match_farewell(text: str, world: "World") -> bool:
     return text in FAREWELL_PHRASES
 
@@ -125,10 +142,15 @@ def _match_direction(text: str, world: "World") -> bool:
     return re.fullmatch(pattern, text) is not None
 
 
-# 规则表：句长上限是第一道保守闸门（超长一律不命中）
+# 规则表：句长上限是第一道保守闸门（超长一律不命中）。
+# presence 插在 greet 之后：同为「交互开场」类整句全等短语（O(1)
+# 集合查找），先于正则/动态查表类意图（问路/查价）执行；既有五意图
+# 相对次序不变，且 presence 六短语与五意图匹配域零交集（既非问候/
+# 告别短语、不以问价尾巴结尾、不匹配时间/问路正则），无跨意图抢占。
 IntentRule = Tuple[str, int, Callable[[str, "World"], bool]]
 INTENT_RULES: Tuple[IntentRule, ...] = (
     ("greet", 6, _match_greet),
+    ("presence", 6, _match_presence),
     ("ask_direction", 12, _match_direction),
     ("ask_price", 8, _match_price),
     ("farewell", 6, _match_farewell),
@@ -223,6 +245,13 @@ def _content_greet(npc: "NPC", world: "World", query: str) -> str:
     return f"你好，我是{npc.persona.name}。"
 
 
+def _content_presence(npc: "NPC", world: "World", query: str) -> str:
+    """确认在场内容模板：中性短句（语气前缀由 _tone_prefix 掩码×8D
+    状态带机制叠加——如 chen 高压时「（皱眉）在，何事？」，本模板
+    不自建语气逻辑）。"""
+    return "在，何事？"
+
+
 def _content_farewell(npc: "NPC", world: "World", query: str) -> str:
     return "慢走，不送。"
 
@@ -277,6 +306,7 @@ def _content_direction(npc: "NPC", world: "World",
 ContentMaker = Callable[["NPC", "World", str], str]
 _CONTENT_MAKERS: Dict[str, ContentMaker] = {
     "greet": _content_greet,
+    "presence": _content_presence,
     "ask_direction": _content_direction,
     "ask_price": _content_price,
     "farewell": _content_farewell,

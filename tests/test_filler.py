@@ -43,8 +43,15 @@ def make_chen_engine(temperament: str = "irritable") -> NPCEngine:
                      npc_configs=[make_chen_persona(temperament)])
 
 
-# 无赞美/批评关键词的输入（避开 PRAISE/CRITICISM 关键字，保证状态增量可精确推算）
-NEUTRAL_TEXT = "在吗"
+# 无赞美/批评关键词的输入（避开 PRAISE/CRITICISM 关键字，保证状态增量可精确推算）。
+# 原为「在吗」——2026-10-10 22:00 PM 裁定 presence（确认在场）意图入
+# 快脑规则表后，「在吗」整句全等命中快脑秒回（0 LLM 调用、token_stats
+# 不聚合），本组测试原意是「filler 随慢脑路径生成/垫话不进 prompt」而非
+# 锁「在吗」走慢脑，故改为不命中快脑六意图的中性慢脑句（已核：不匹配
+# 问候/告别/presence 短语、不以问价尾巴结尾、不匹配时间/问路问法，
+# 且不含赞美/批评关键词——沿用 test_background_npc.py 同款「改测试
+# 样例而非迁就快脑」裁定口径）。
+NEUTRAL_TEXT = "最近生意怎么样？"
 
 
 # ============================================================================ #

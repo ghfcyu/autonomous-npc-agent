@@ -1,7 +1,7 @@
 """快脑引擎对抗性测试：T3 快慢脑分流（规则匹配 + 0-token + 性格-状态双向接入）。
 
 对抗性设计（先红后绿，断言精确到行为语义）：
-1. 五意图规则齐全锁 + 正例命中 + ≥4 条反例不命中（保守匹配闸门）
+1. 六意图规则齐全锁 + 正例命中 + ≥4 条反例不命中（保守匹配闸门）
 2. token 基线 4 句硬保护：全部不命中走慢脑（快脑误伤基线即失败）
 3. 0-token 实证：快脑命中后 MockLLMProvider.call_count 不变、
    engine.token_stats 的 calls 与 total_tokens 均不变
@@ -15,6 +15,9 @@
 10. 查价语义对齐（第九次审查指令 1）：问什么答什么——问铁锤答铁锤、
     问铁锤不得答铁剑（审查点名反例锁）；越界/未知商品回通用句
 11. greet 高频口语变体（你好呀/你好啊）：快脑秒回且 0-token
+12. presence 确认在场（2026-10-10 22:00 PM 裁定：非固化采样 GAP
+    扩充）：4 条 GAP 候选整句全等命中快脑 0-token 秒回；复杂寒暄
+    /带后续内容长句不误拦；语气前缀由掩码×8D 状态带叠加实证
 """
 
 import sys
@@ -26,7 +29,8 @@ import unittest
 
 from engine.actions import ActionType
 from engine.engine import NPCEngine
-from engine.fast_brain import (FAST_REPLY_TONES, INTENT_RULES, FastBrain,
+from engine.fast_brain import (FAST_REPLY_TONES, INTENT_RULES,
+                                PRESENCE_PHRASES, FastBrain,
                                 _DEFAULT_PRICE)
 from engine.llm.mock import MockLLMProvider
 from engine.npc import Persona
@@ -41,6 +45,7 @@ TOKEN_BASELINE_SENTENCES = (
 # 各意图正例样本（respond 命中的输入 → intent_id）
 POSITIVE_SAMPLES = {
     "greet": ("你好", "你好呀", "你好啊", "晚上好", "喂"),
+    "presence": ("在吗", "有人吗", "老板在吗", "请问有人在吗", "你在吗", "师父在吗"),
     "ask_direction": ("铁匠铺怎么走", "水井边在哪", "请问面包铺在哪里"),
     "ask_price": ("这个多少钱", "贵不贵", "剑要多少钱"),
     "farewell": ("再见", "我走了"),
@@ -70,13 +75,16 @@ def make_chen_engine(temperament: str = "") -> NPCEngine:
 # ============================================================================ #
 
 class TestRuleTableLock(unittest.TestCase):
-    """五意图规则齐全性 + 装配模式锁（防"悄悄删规则"回归）。"""
+    """六意图规则齐全性 + 装配模式锁（防"悄悄删规则"回归）。"""
 
-    def test_five_intents_in_order(self):
-        """五意图齐全且顺序稳定（greet → direction → price → farewell → time）。"""
+    def test_six_intents_in_order(self):
+        """六意图齐全且顺序稳定（greet → presence → direction → price
+        → farewell → time）。presence 插在 greet 之后（2026-10-10
+        22:00 PM 裁定：同为交互开场类整句全等短语，先于正则类意图
+        执行；既有五意图相对次序不变）。"""
         ids = [r[0] for r in INTENT_RULES]
-        self.assertEqual(ids, ["greet", "ask_direction", "ask_price",
-                               "farewell", "ask_time"],
+        self.assertEqual(ids, ["greet", "presence", "ask_direction",
+                               "ask_price", "farewell", "ask_time"],
                          f"意图规则表缺失或乱序：{ids}")
 
     def test_every_npc_holds_fast_brain(self):
@@ -101,7 +109,7 @@ class TestRuleTableLock(unittest.TestCase):
 # ============================================================================ #
 
 class TestIntentMatching(unittest.TestCase):
-    """五意图正例命中断言（intent_id 与 Action 结构）。"""
+    """六意图正例命中断言（intent_id 与 Action 结构）。"""
 
     def setUp(self):
         self.engine = make_chen_engine("")
@@ -118,6 +126,10 @@ class TestIntentMatching(unittest.TestCase):
     def test_greet_hits(self):
         for text in POSITIVE_SAMPLES["greet"]:
             self._hit(text, "greet")
+
+    def test_presence_hits(self):
+        for text in POSITIVE_SAMPLES["presence"]:
+            self._hit(text, "presence")
 
     def test_direction_hits(self):
         for text in POSITIVE_SAMPLES["ask_direction"]:
@@ -305,7 +317,8 @@ class TestPersonaStateFork(unittest.TestCase):
 
     def test_reply_length_lock(self):
         """≤40 字符锁：全掩码 × 全状态带 × 全意图的回复一律不超长。"""
-        samples = {"greet": "你好", "ask_direction": "铁匠铺怎么走",
+        samples = {"greet": "你好", "presence": "在吗",
+                   "ask_direction": "铁匠铺怎么走",
                    "ask_price": "这个多少钱", "farewell": "再见",
                    "ask_time": "几点了"}
         band_presets = ({"S_stress": 0.7}, {"e_A": 0.8}, {"e_P": 0.3},
@@ -517,6 +530,98 @@ class TestPriceSemanticAlignment(unittest.TestCase):
         （语气前缀属掩码层，不在此锁）。"""
         self.assertIn(_DEFAULT_PRICE, self._price_reply("锄头多少钱"),
                       "未知商品应回通用句，不得报职业默认报价")
+
+
+# ============================================================================ #
+# 12. presence 确认在场（2026-10-10 22:00 PM 裁定：非固化采样 GAP 扩充）
+# ============================================================================ #
+
+class TestPresenceIntent(unittest.TestCase):
+    """presence 确认在场意图：GAP 候选 4 条秒回 + 复杂句不误拦 + 语气前缀。
+
+    背景：审查第九次指令 2 非固化采样（13 条）暴露快脑覆盖缺口
+    ——「老板在吗/在吗/有人吗/请问有人在吗」高频封闭句式全走慢脑，
+    每条白付一次约 1200 prompt token 的 LLM 调用只为回一个「在」字；
+    PM 裁定扩充 presence 意图（数据驱动的核心体验交付，非防御性
+    数字修补）。token 基线 4 句硬保护由既有 TestBaselineProtection
+    锁定（presence 句不进基线 4 句，零回归由全量跑通实证）。
+    """
+
+    def setUp(self):
+        self.engine = make_chen_engine("irritable")
+        self.npc = self.engine.npcs["chen"]
+        self.world = self.engine.world
+
+    def test_presence_phrase_table_exact_set(self):
+        """短语表精确集合锁：PM 裁定的六短语一个不多一个不少（防悄悄
+        增删改口径）。"""
+        self.assertEqual(
+            set(PRESENCE_PHRASES),
+            {"在吗", "有人吗", "老板在吗", "请问有人在吗", "你在吗", "师父在吗"},
+            "presence 短语表与 PM 裁定集合不一致")
+
+    def test_gap_candidates_hit_fast_zero_llm(self):
+        """4 条 GAP 候选（非固化采样类别 C 同款）全部命中 presence
+        走快脑，LLM 调用 0 次（mock.call_count 差值口径）且全局
+        token 统计不变。"""
+        calls_before = self.engine.llm.call_count
+        status_before = self.engine.status()["token_stats"]
+        for text in ("老板在吗", "在吗", "有人吗", "请问有人在吗"):
+            result = self.engine.player_says(text, "chen")
+            self.assertEqual(result["brain"], "fast",
+                             f"「{text}」应命中 presence 快脑秒回（GAP 收口）")
+            self.assertEqual(result["action"]["intent"], "presence",
+                             f"「{text}」intent 应为 presence")
+        self.assertEqual(self.engine.llm.call_count, calls_before,
+                         "presence 快脑秒回不得产生 LLM 调用")
+        self.assertEqual(self.engine.status()["token_stats"], status_before,
+                         "presence 快脑秒回污染了全局 token 统计")
+
+    def test_full_phrase_set_hits(self):
+        """短语表全集命中（含「你在吗/师父在吗」），intent 均为 presence。"""
+        for text in PRESENCE_PHRASES:
+            action = self.npc.fast_brain.respond(text, self.npc, self.world)
+            self.assertIsNotNone(action, f"「{text}」应命中 presence")
+            self.assertEqual(action.payload["intent"], "presence")
+
+    def test_complex_greeting_not_intercepted(self):
+        """复杂寒暄反例：含「请问」与「吗」但长句带内容（「你好，请问
+        铁匠铺还开着吗？」）不得命中快脑——presence 是整句全等 +
+        句长闸门 6，非子串匹配。"""
+        self.assertIsNone(
+            self.npc.fast_brain.respond("你好，请问铁匠铺还开着吗？",
+                                        self.npc, self.world),
+            "复杂寒暄被 presence 误拦——走慢脑语义被破坏")
+        result = self.engine.player_says("你好，请问铁匠铺还开着吗？", "chen")
+        self.assertEqual(result["brain"], "slow")
+
+    def test_presence_with_trailing_content_not_intercepted(self):
+        """带后续内容反例：「有人在吗？我想打听点事」不命中快脑走慢脑
+        （整句 11 字非全等短语，且「有人在吗」本身不在短语表内）。"""
+        self.assertIsNone(
+            self.npc.fast_brain.respond("有人在吗？我想打听点事",
+                                        self.npc, self.world),
+            "带后续内容的问在场句被 presence 误拦")
+        result = self.engine.player_says("有人在吗？我想打听点事", "chen")
+        self.assertEqual(result["brain"], "slow")
+
+    def test_presence_reply_tone_prefix(self):
+        """语气前缀实证：irritable 掩码 + S_stress 高压带（>0.6，与
+        filler 同阈值）→ presence 回复带「（皱眉）」前缀（掩码×8D
+        状态带自动叠加，内容模板不自建语气逻辑）。"""
+        self.npc.inner_state.S_stress = 0.7
+        action = self.npc.fast_brain.respond("在吗", self.npc, self.world)
+        self.assertIsNotNone(action)
+        reply = action.payload["text"]
+        self.assertIn("（皱眉）", reply, "presence 回复未消费脾气掩码×8D 状态")
+        self.assertIn("在，何事？", reply, "presence 内容模板被改写")
+
+    def test_presence_neutral_without_mask(self):
+        """无掩码中性变体：不带语气前缀，内容即「在，何事？」。"""
+        self.npc.persona.temperament = ""
+        action = self.npc.fast_brain.respond("在吗", self.npc, self.world)
+        self.assertIsNotNone(action)
+        self.assertEqual(action.payload["text"], "在，何事？")
 
 
 if __name__ == "__main__":

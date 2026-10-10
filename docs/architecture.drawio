@@ -1,158 +1,213 @@
-<mxGraphModel dx="1500" dy="1100" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1100" math="0" shadow="0">
+<mxGraphModel dx="1600" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1640" pageHeight="1420" math="0" shadow="0">
   <root>
     <mxCell id="0" />
     <mxCell id="1" parent="0" />
 
-    <mxCell id="2" value="玩家 / 游戏事件&#10;玩家输入 · 时间推进 · 送礼互动 · 换装" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontStyle=1" vertex="1" parent="1">
-      <mxGeometry x="500" y="20" width="400" height="60" as="geometry" />
+    <mxCell id="2" value="玩家 / 游戏事件&#10;玩家输入 · 时间推进 · 送礼互动 · 换装" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#333333;fontSize=13;fontStyle=1" vertex="1" parent="1">
+      <mxGeometry x="560" y="20" width="420" height="60" as="geometry" />
     </mxCell>
 
-    <mxCell id="3" value="感知 / 世界层" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=15;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
-      <mxGeometry x="60" y="100" width="1280" height="230" as="geometry" />
+    <mxCell id="3" value="感知 / 世界层（engine/world.py）" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
+      <mxGeometry x="60" y="100" width="1440" height="250" as="geometry" />
     </mxCell>
-    <mxCell id="4" value="World 世界状态&#10;时间 · 天气 · 地点 · 物品&#10;Entity.appearance&#10;(outfit穿着/posture姿态/expression神情)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12" vertex="1" parent="1">
-      <mxGeometry x="90" y="145" width="280" height="120" as="geometry" />
+    <mxCell id="4" value="World 世界状态&#10;时间 · 天气 · 地点 · 物品&#10;Entity.appearance&#10;(outfit/posture/expression)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11" vertex="1" parent="1">
+      <mxGeometry x="90" y="150" width="260" height="120" as="geometry" />
     </mxCell>
-    <mxCell id="5" value="EventBus 事件总线&#10;发布/订阅 · 事件历史&#10;事件类型: player_spoke / item_given /&#10;env_event / appearance_change / npc_action" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12" vertex="1" parent="1">
-      <mxGeometry x="400" y="145" width="310" height="120" as="geometry" />
+    <mxCell id="5" value="EventBus 事件总线&#10;发布/订阅 · 事件历史&#10;player_spoke / item_given&#10;env_event / appearance_change&#10;npc_action" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11" vertex="1" parent="1">
+      <mxGeometry x="380" y="150" width="300" height="120" as="geometry" />
     </mxCell>
-    <mxCell id="6" value="EventSlot 随机事件槽&#10;+5%累积 → 满100%触发env_event&#10;世界自发产生事件" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12" vertex="1" parent="1">
-      <mxGeometry x="740" y="145" width="260" height="100" as="geometry" />
+    <mxCell id="6" value="EventSlot 随机事件槽&#10;+5% 累积 → 满 100% 触发&#10;env_event&#10;（世界自发事件）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11" vertex="1" parent="1">
+      <mxGeometry x="710" y="150" width="230" height="120" as="geometry" />
     </mxCell>
-    <mxCell id="7" value="Location.category 三类&#10;shop 店铺(5) / public 公共(2) / residence 居所(10)&#10;configs/locations.json&#10;→ World._load_locations_from_file" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12" vertex="1" parent="1">
-      <mxGeometry x="1040" y="145" width="270" height="140" as="geometry" />
+    <mxCell id="7" value="Location 三类 17 地点&#10;shop(5) / public(2) /&#10;residence(10)&#10;configs/locations.json" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11" vertex="1" parent="1">
+      <mxGeometry x="970" y="150" width="250" height="120" as="geometry" />
     </mxCell>
-    <mxCell id="7a" value="appearance_change 链路: set_appearance() → appearance_change事件 → NPC感知(同地点) → snapshot nearby携带外观 → 【周围的人】" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontColor=#4477aa" vertex="1" parent="1">
-      <mxGeometry x="90" y="280" width="910" height="35" as="geometry" />
+    <mxCell id="7c" value="World.snapshot()&#10;nearby 同地点实体+外观&#10;→ 决策上下文【周围的人】" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11" vertex="1" parent="1">
+      <mxGeometry x="1250" y="150" width="230" height="120" as="geometry" />
     </mxCell>
-
-    <mxCell id="8" value="记忆层 MemorySystem" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=15;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
-      <mxGeometry x="60" y="360" width="400" height="180" as="geometry" />
-    </mxCell>
-    <mxCell id="9" value="短期记忆&#10;当前会话 · 容量30" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=12" vertex="1" parent="1">
-      <mxGeometry x="80" y="410" width="170" height="60" as="geometry" />
-    </mxCell>
-    <mxCell id="10" value="长期记忆&#10;持久化JSON · 标签检索" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=12" vertex="1" parent="1">
-      <mxGeometry x="270" y="410" width="170" height="60" as="geometry" />
-    </mxCell>
-    <mxCell id="11" value="事件驱动直写(importance≥0.7实时入长期) + 定期巩固摘要" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontColor=#557755" vertex="1" parent="1">
-      <mxGeometry x="70" y="485" width="380" height="40" as="geometry" />
+    <mxCell id="7a" value="appearance_change 链路: set_appearance() → 事件 → NPC 感知(同地点) → snapshot nearby 携带外观 → 【周围的人】" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontColor=#4477aa" vertex="1" parent="1">
+      <mxGeometry x="90" y="285" width="1310" height="30" as="geometry" />
     </mxCell>
 
-    <mxCell id="12" value="关系网络层 RelationshipNetwork" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=15;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
-      <mxGeometry x="500" y="360" width="380" height="180" as="geometry" />
+    <mxCell id="8" value="记忆层 MemorySystem" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
+      <mxGeometry x="60" y="370" width="340" height="190" as="geometry" />
     </mxCell>
-    <mxCell id="13" value="Relationship&#10;source→target · 类型(父子/熟人/宿敌)&#10;好感值(-1.0~1.0)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=12" vertex="1" parent="1">
-      <mxGeometry x="520" y="410" width="340" height="70" as="geometry" />
+    <mxCell id="9" value="短期记忆&#10;当前会话 · 容量30" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11" vertex="1" parent="1">
+      <mxGeometry x="80" y="415" width="140" height="60" as="geometry" />
     </mxCell>
-    <mxCell id="14" value="RelationshipNetwork&#10;query() / to_prompt_text()&#10;configs/relationships.json (8条)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=12" vertex="1" parent="1">
-      <mxGeometry x="520" y="490" width="340" height="40" as="geometry" />
+    <mxCell id="10" value="长期记忆&#10;持久化JSON · 标签检索" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11" vertex="1" parent="1">
+      <mxGeometry x="240" y="415" width="140" height="60" as="geometry" />
     </mxCell>
-
-    <mxCell id="16" value="内状态层 InnerState" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=15;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
-      <mxGeometry x="920" y="360" width="420" height="180" as="geometry" />
-    </mxCell>
-    <mxCell id="17" value="5维参数向量&#10;arousal·mood·energy&#10;·stress·trust" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;fontSize=12" vertex="1" parent="1">
-      <mxGeometry x="940" y="410" width="180" height="70" as="geometry" />
-    </mxCell>
-    <mxCell id="18" value="StateUpdater&#10;规则引擎 · 挂事件总线&#10;实时更新" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;fontSize=12" vertex="1" parent="1">
-      <mxGeometry x="1140" y="410" width="180" height="70" as="geometry" />
-    </mxCell>
-    <mxCell id="19" value="心理·物理·社会三层标签（可推断人格，标签影响参数增量幅度）" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontColor=#996600" vertex="1" parent="1">
-      <mxGeometry x="930" y="495" width="400" height="30" as="geometry" />
+    <mxCell id="11" value="事件驱动直写(importance≥0.7 实时入长期)&#10;+ 定期巩固摘要 · context_for() 语义检索" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontColor=#557755" vertex="1" parent="1">
+      <mxGeometry x="70" y="490" width="320" height="45" as="geometry" />
     </mxCell>
 
-    <mxCell id="20" value="背景 NPC 层 BackgroundNPC（独立 EventBus 订阅 · 零 LLM）" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=13;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
-      <mxGeometry x="60" y="580" width="520" height="200" as="geometry" />
+    <mxCell id="16" value="内状态层 InnerState（8D 正交心智基底 · T1）" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=14;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
+      <mxGeometry x="440" y="370" width="400" height="190" as="geometry" />
     </mxCell>
-    <mxCell id="21" value="BackgroundNPC&#10;EventBus订阅者·不持有LLM引用&#10;residence居所 / schedule作息&#10;(G6-A 先存储，后续驱动)&#10;configs/background_npcs/*.json" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;fontSize=12" vertex="1" parent="1">
-      <mxGeometry x="80" y="630" width="220" height="110" as="geometry" />
+    <mxCell id="17" value="8D 基底 [0,1]&#10;4D 生理(疲劳/饥饿/痛感/驱力)&#10;3D PAD(愉悦/唤醒/支配)+压力" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;fontSize=11" vertex="1" parent="1">
+      <mxGeometry x="460" y="415" width="180" height="75" as="geometry" />
     </mxCell>
-    <mxCell id="22" value="规则反应引擎&#10;事件类型过滤 + 位置过滤&#10;模板轮转 → 格式化" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;fontSize=12" vertex="1" parent="1">
-      <mxGeometry x="330" y="630" width="220" height="110" as="geometry" />
+    <mxCell id="18" value="StateUpdater&#10;荀子六情→PAD 矢量&#10;挂 EventBus 实时更新" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;fontSize=11" vertex="1" parent="1">
+      <mxGeometry x="660" y="415" width="160" height="75" as="geometry" />
     </mxCell>
-    <mxCell id="23" value="→ 发布 npc_action 事件回流 EventBus → 同地点核心NPC感知写入记忆 · 全程零 LLM / 零 token" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontColor=#666666" vertex="1" parent="1">
-      <mxGeometry x="70" y="745" width="500" height="25" as="geometry" />
-    </mxCell>
-
-    <mxCell id="24" value="决策层 DecisionEngine（混合决策 · 核心 NPC）" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=15;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
-      <mxGeometry x="620" y="580" width="720" height="200" as="geometry" />
-    </mxCell>
-    <mxCell id="25" value="状态机&#10;硬约束(作息/迁移)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=12" vertex="1" parent="1">
-      <mxGeometry x="640" y="625" width="160" height="70" as="geometry" />
-    </mxCell>
-    <mxCell id="26" value="内状态硬规则&#10;压力&gt;0.8拒单&#10;精力&lt;0.15收摊" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=12" vertex="1" parent="1">
-      <mxGeometry x="820" y="625" width="160" height="70" as="geometry" />
-    </mxCell>
-    <mxCell id="27" value="LLM 柔性表达&#10;对话生成&#10;(Provider可插拔)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=12" vertex="1" parent="1">
-      <mxGeometry x="1000" y="625" width="160" height="70" as="geometry" />
-    </mxCell>
-    <mxCell id="28" value="决策上下文注入：&#10;【此刻内心】InnerState  ·  【周围的人】snapshot nearby+外观  ·  【人际关系】RelationshipNetwork" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=12;fontStyle=1" vertex="1" parent="1">
-      <mxGeometry x="640" y="710" width="680" height="55" as="geometry" />
+    <mxCell id="19" value="to_discrete_tags()：BAND_* 阈值单一来源 → ≤4 高显著度离散中文标签（无浮点）" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontColor=#996600;fontStyle=1" vertex="1" parent="1">
+      <mxGeometry x="450" y="498" width="380" height="40" as="geometry" />
     </mxCell>
 
-    <mxCell id="29" value="行动层" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=15;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
-      <mxGeometry x="200" y="820" width="1000" height="110" as="geometry" />
+    <mxCell id="12" value="关系网络层 RelationshipNetwork" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=14;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
+      <mxGeometry x="880" y="370" width="320" height="190" as="geometry" />
     </mxCell>
-    <mxCell id="30" value="ActionValidator&#10;动作白名单 + 状态/世界一致性校验" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12" vertex="1" parent="1">
-      <mxGeometry x="230" y="865" width="440" height="50" as="geometry" />
+    <mxCell id="13" value="Relationship&#10;source→target · 类型(父子/熟人/宿敌)&#10;好感值(-1.0~1.0)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=11" vertex="1" parent="1">
+      <mxGeometry x="900" y="415" width="280" height="65" as="geometry" />
     </mxCell>
-    <mxCell id="31" value="ActionExecutor&#10;执行动作 · 产出新事件回流总线" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12" vertex="1" parent="1">
-      <mxGeometry x="700" y="865" width="440" height="50" as="geometry" />
-    </mxCell>
-
-    <mxCell id="32" value="世界状态变更 / 新事件" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontStyle=1" vertex="1" parent="1">
-      <mxGeometry x="500" y="960" width="400" height="50" as="geometry" />
+    <mxCell id="14" value="RelationshipNetwork&#10;query()/to_prompt_text()&#10;亲缘度 trust（T1 迁入 · StateUpdater 改写）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=11" vertex="1" parent="1">
+      <mxGeometry x="900" y="490" width="280" height="60" as="geometry" />
     </mxCell>
 
-    <mxCell id="40" value="事件流入" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11" edge="1" parent="1" source="2" target="3">
+    <mxCell id="40" value="快慢脑分流层（T3 · FillerEngine 旁路 + FastBrain 判定门）" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
+      <mxGeometry x="440" y="590" width="400" height="210" as="geometry" />
+    </mxCell>
+    <mxCell id="41" value="FillerEngine 垫话引擎（旁路）&#10;脾气掩码 × 8D 状态带 → 垫话占位&#10;慢脑 LLM 调用前同步返回&#10;0-token · 不进 LLM prompt" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=11" vertex="1" parent="1">
+      <mxGeometry x="460" y="628" width="360" height="72" as="geometry" />
+    </mxCell>
+    <mxCell id="42" value="FastBrain 快脑判定门&#10;六意图整句全等+句长闸门:&#10;greet/presence/问路/查价/告别/报时&#10;fast_brain_stats 接管率: 固化 66.7% · 非固化 61.5%" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=11" vertex="1" parent="1">
+      <mxGeometry x="460" y="718" width="360" height="72" as="geometry" />
+    </mxCell>
+
+    <mxCell id="30" value="标签层 v2（T2 · tag_genesis + tag_mount 双模块）" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d4f1f4;strokeColor=#5e9aa8;fontSize=14;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
+      <mxGeometry x="880" y="590" width="320" height="210" as="geometry" />
+    </mxCell>
+    <mxCell id="31" value="tag_genesis 生成器&#10;6D 正态属性 · 财富对数正态&#10;金字塔 70/20/8/2 · 齐普夫职业&#10;尧氏 8 风格 × 4 阶" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#5e9aa8;fontSize=11" vertex="1" parent="1">
+      <mxGeometry x="900" y="628" width="280" height="70" as="geometry" />
+    </mxCell>
+    <mxCell id="32" value="tag_mount → TagLedger 账本&#10;缺陷/把柄强制挂载 · 四时态&#10;互斥锁 · visible_tags() 唯一入口&#10;把柄 secret 绝密隔离永不进 prompt" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#5e9aa8;fontSize=11" vertex="1" parent="1">
+      <mxGeometry x="900" y="712" width="280" height="70" as="geometry" />
+    </mxCell>
+    <mxCell id="34" value="挂载常驻化: configs 声明 tag_profile=genesis → spawn 自动挂载（「断指的铁匠陈」为默认状态）" style="text;html=1;align=center;verticalAlign=middle;fontSize=10;fontColor=#5e9aa8" vertex="1" parent="1">
+      <mxGeometry x="890" y="778" width="300" height="18" as="geometry" />
+    </mxCell>
+
+    <mxCell id="24" value="决策层（慢脑 DecisionEngine · engine/decision.py）" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
+      <mxGeometry x="60" y="830" width="1440" height="270" as="geometry" />
+    </mxCell>
+    <mxCell id="25" value="状态机&#10;硬约束&#10;(作息/迁移)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=11" vertex="1" parent="1">
+      <mxGeometry x="80" y="880" width="170" height="70" as="geometry" />
+    </mxCell>
+    <mxCell id="26" value="内状态硬规则&#10;S_stress&gt;0.8 拒单&#10;p_fatigue&gt;0.85 收摊" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=11" vertex="1" parent="1">
+      <mxGeometry x="270" y="880" width="170" height="70" as="geometry" />
+    </mxCell>
+    <mxCell id="27" value="LLM 柔性表达&#10;JSON 动作契约&#10;(Provider 可插拔)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=11" vertex="1" parent="1">
+      <mxGeometry x="460" y="880" width="170" height="70" as="geometry" />
+    </mxCell>
+    <mxCell id="28" value="决策上下文注入（&lt;35token 极简组装 · T3 落地）&#10;【此刻内心】to_discrete_tags() ≤4 高显著度离散中文标签（替换旧 8 参数浮点文本 · 无浮点向量）&#10;【身份标签】TagLedger.visible_tags() ｜【人际关系】RelationshipNetwork.to_prompt_text()&#10;【周围的人】World.snapshot() nearby+外观 ｜ 相关长期记忆 + recent(4) 短期记忆裁剪" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=11;fontStyle=1" vertex="1" parent="1">
+      <mxGeometry x="650" y="880" width="820" height="130" as="geometry" />
+    </mxCell>
+    <mxCell id="29" value="快脑 fast 路径: 命中意图 → SPEAK Action 秒回直达行动层（旁路整个慢脑链 · 0 次 LLM 调用 · 延迟&lt;20ms）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=1" vertex="1" parent="1">
+      <mxGeometry x="80" y="970" width="540" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="29b" value="慢脑链: 上下文组装 → LLM(JSON 动作契约) → ActionValidator 校验 → 失败回退人格 fallback_bank" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontColor=#776688" vertex="1" parent="1">
+      <mxGeometry x="650" y="1030" width="820" height="45" as="geometry" />
+    </mxCell>
+
+    <mxCell id="20" value="背景 NPC 层 BackgroundNPC（EventBus 订阅 · 零 LLM）" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=13;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
+      <mxGeometry x="60" y="1130" width="520" height="210" as="geometry" />
+    </mxCell>
+    <mxCell id="21" value="BackgroundNPC&#10;EventBus 订阅者·不持有 LLM&#10;residence/schedule 作息驱动" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;fontSize=11" vertex="1" parent="1">
+      <mxGeometry x="80" y="1180" width="220" height="100" as="geometry" />
+    </mxCell>
+    <mxCell id="22" value="规则反应引擎&#10;事件类型+位置过滤&#10;模板轮转 → 格式化" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;fontSize=11" vertex="1" parent="1">
+      <mxGeometry x="320" y="1180" width="230" height="100" as="geometry" />
+    </mxCell>
+    <mxCell id="23" value="→ 发布 npc_action 事件回流 EventBus → 同地点核心 NPC 感知写入记忆 · 全程零 LLM / 零 token" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontColor=#666666" vertex="1" parent="1">
+      <mxGeometry x="70" y="1290" width="500" height="30" as="geometry" />
+    </mxCell>
+
+    <mxCell id="29c" value="行动层" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
+      <mxGeometry x="620" y="1130" width="880" height="120" as="geometry" />
+    </mxCell>
+    <mxCell id="30b" value="ActionValidator&#10;动作白名单 + 状态/世界一致性校验" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11" vertex="1" parent="1">
+      <mxGeometry x="650" y="1175" width="390" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="31b" value="ActionExecutor&#10;执行动作 · 产出新事件回流总线" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11" vertex="1" parent="1">
+      <mxGeometry x="1060" y="1175" width="410" height="50" as="geometry" />
+    </mxCell>
+
+    <mxCell id="32" value="世界状态变更 / 新事件" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#333333;fontSize=13;fontStyle=1" vertex="1" parent="1">
+      <mxGeometry x="860" y="1290" width="400" height="50" as="geometry" />
+    </mxCell>
+
+    <mxCell id="50" value="事件流入" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11" edge="1" parent="1" source="2" target="3">
       <mxGeometry relative="1" as="geometry" />
     </mxCell>
-    <mxCell id="41" value="events" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11;exitX=0.15;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="3" target="8">
+    <mxCell id="51" value="events 写入记忆" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11;exitX=0.12;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="3" target="8">
       <mxGeometry relative="1" as="geometry" />
     </mxCell>
-    <mxCell id="42" value="events" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11;exitX=0.8;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="3" target="16">
+    <mxCell id="52" value="events → StateUpdater" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11;exitX=0.4;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="3" target="16">
       <mxGeometry relative="1" as="geometry" />
     </mxCell>
-    <mxCell id="43" value="events" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11;exitX=0.32;exitY=1;exitDx=0;exitDy=0;entryX=0.8;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="3" target="20">
+    <mxCell id="53" value="update_affinity 亲缘度" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#b85450;fontSize=11;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0" edge="1" parent="1" source="16" target="12">
       <mxGeometry relative="1" as="geometry" />
     </mxCell>
-    <mxCell id="44" value="context_for()" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.15;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="8" target="24">
+    <mxCell id="54" value="context_for() 相关记忆" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.12;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="8" target="24">
       <mxGeometry relative="1" as="geometry" />
     </mxCell>
-    <mxCell id="45" value="to_prompt_text() → 【人际关系】" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.4;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="12" target="24">
-      <mxGeometry relative="1" as="geometry" />
-    </mxCell>
-    <mxCell id="46" value="to_prompt_text()+标签 → 【此刻内心】" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="16" target="24">
-      <mxGeometry relative="1" as="geometry" />
-    </mxCell>
-    <mxCell id="47" value="npc_action 回流" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;strokeColor=#888888;fontSize=11;exitX=0;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.8;entryDx=0;entryDy=0" edge="1" parent="1" source="20" target="3">
+    <mxCell id="55" value="to_discrete_tags() ≤4 离散标签 →【此刻内心】" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#d79b00;fontSize=11;exitX=0;exitY=0.8;exitDx=0;exitDy=0;entryX=0.26;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="16" target="24">
       <mxGeometry relative="1" as="geometry">
         <Array as="points">
-          <mxPoint x="30" y="640" />
-          <mxPoint x="30" y="330" />
+          <mxPoint x="430" y="522" />
+          <mxPoint x="430" y="830" />
         </Array>
       </mxGeometry>
     </mxCell>
-    <mxCell id="48" value="snapshot(nearby+外观) → 【周围的人】" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#4477aa;fontSize=11;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0" edge="1" parent="1" source="3" target="24">
+    <mxCell id="56" value="8D 状态带（filler/tone 消费）" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#d79b00;fontSize=11;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="16" target="40">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="57" value="to_prompt_text() →【人际关系】" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11;exitX=0;exitY=0.7;exitDx=0;exitDy=0;entryX=0.56;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="12" target="24">
       <mxGeometry relative="1" as="geometry">
         <Array as="points">
-          <mxPoint x="1370" y="215" />
-          <mxPoint x="1370" y="680" />
+          <mxPoint x="870" y="503" />
+          <mxPoint x="870" y="830" />
         </Array>
       </mxGeometry>
     </mxCell>
-    <mxCell id="49" value="Action(JSON)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11" edge="1" parent="1" source="24" target="29">
+    <mxCell id="58" value="visible_tags() →【身份标签】" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#5e9aa8;fontSize=11;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.68;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="30" target="24">
       <mxGeometry relative="1" as="geometry" />
     </mxCell>
-    <mxCell id="50" value="执行效果" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11" edge="1" parent="1" source="29" target="32">
+    <mxCell id="59" value="生成 → 挂载" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#5e9aa8;fontSize=11;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="31" target="32">
       <mxGeometry relative="1" as="geometry" />
     </mxCell>
-    <mxCell id="51" value="事件回流 · 闭环" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;strokeColor=#666666;fontSize=11;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0" edge="1" parent="1" source="32" target="2">
+    <mxCell id="60" value="未命中 → 慢脑 LLM 决策链（slow）" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11;exitX=0.3;exitY=1;exitDx=0;exitDy=0;entryX=0.42;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="40" target="24">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="61" value="fast：0-token 秒回（0 次 LLM 调用）" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#d6b656;fontSize=11;fontStyle=1;exitX=0.9;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0" edge="1" parent="1" source="40" target="29c">
       <mxGeometry relative="1" as="geometry">
         <Array as="points">
-          <mxPoint x="1420" y="985" />
-          <mxPoint x="1420" y="50" />
+          <mxPoint x="800" y="815" />
+          <mxPoint x="1560" y="815" />
+          <mxPoint x="1560" y="1190" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="62" value="Action(JSON)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11;exitX=0.7;exitY=1;exitDx=0;exitDy=0;entryX=0.51;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="24" target="29c">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="63" value="执行效果" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;fontSize=11;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="29c" target="32">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="64" value="事件回流 · 闭环" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;strokeColor=#666666;fontSize=11;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0" edge="1" parent="1" source="32" target="2">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="1600" y="1315" />
+          <mxPoint x="1600" y="50" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="65" value="npc_action 回流" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;strokeColor=#888888;fontSize=11;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0" edge="1" parent="1" source="20" target="3">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="30" y="1235" />
+          <mxPoint x="30" y="225" />
         </Array>
       </mxGeometry>
     </mxCell>

@@ -284,7 +284,7 @@ NPCEngine.tick(minutes)
 ```
 
 - **垫话引擎原型已落地（2026-10-06，主人裁定 17 提前先行）**：`engine/filler.py` 脾气掩码粗粒度 3 掩码（irritable/cheerful/aloof）× 8D 状态带规则，`player_says` 结果含 `filler` 字段；T2 落地林传鼎 8 脾气掩码后替换为标准掩码表
-- **快脑 FastBrain 原型落地（2026-10-09 22:00，`engine/fast_brain.py`）**：greet/ask_direction/ask_price/farewell/ask_time 五意图规则匹配，命中直接产出 SPEAK Action 0-token 秒回（跳过慢脑 LLM 决策链）；`player_says` 返回新增 `"brain": "fast"|"slow"` 分流路径字段，引擎 `fast_brain_stats = {"hits": n, "total": m}` 接管率统计（`status()` 含 `fast_brain` 字段），接管率实测 `scripts/fast_brain_takeover.py`（12 条混合对话口径，期望 8/12 ≈ 66.7%，验收线 ≥50%）；接线设计与掩码 id 统一方案见下节
+- **快脑 FastBrain 落地（2026-10-09 22:00 原型 + 2026-10-10 presence 扩充，`engine/fast_brain.py`）**：greet/presence/ask_direction/ask_price/farewell/ask_time 六意图规则匹配（presence 为非固化采样数据驱动扩充：「在吗/老板在吗/有人吗/请问有人在吗」类高频封闭句式原先每条白付约 1200 prompt token 的 LLM 调用只为回一个“在”字），命中直接产出 SPEAK Action 0-token 秒回（跳过慢脑 LLM 决策链）；`player_says` 返回 `"brain": "fast"|"slow"` 分流路径字段，引擎 `fast_brain_stats` 接管率统计（`status()` 含 `fast_brain` 字段）；实测双口径：`scripts/fast_brain_takeover.py` 固化 12 条混合对话 8/12=66.7%（验收线 ≥50%）+ `scripts/fast_brain_takeover_open.py` 非固化二次采样 13 条四类分布 8/13=61.5%（GAP 候选 4/4 拦截，审查指令 2 口径）；接线设计与掩码 id 统一方案见下节
 - **<35 token 极简 Prompt 组装已落地（2026-10-10）**：`InnerState.to_discrete_tags()` 把 8D 映射为 ≤4 个高显著度离散中文标签（阈值常量 `BAND_*` 全仓单一来源，filler.py 掩码同源引用），按偏离幅度降序取 top4、全常带返回"心境平稳"；【此刻内心】行从 8 参数"名: 值"浮点文本（71 字符≈32 token）改为离散标签，旧 `to_prompt_text()` 按无双轨纪律删除，token 基线 4769→4501（-268，4 次慢脑调用实测）
 - 四级算力分流：Tier 0 纯数学物理（<0.1ms）/ Tier 1 规则与哈希（<0.5ms）/ Tier 2 端侧小模型 / Tier 3 云端 LLM（仅深度叙事）——环境 NPC 封印在 Tier 0/1
 
@@ -309,10 +309,10 @@ NPCEngine.tick(minutes)
       └─ 未命中 → 慢脑：记忆检索 → 上下文组装 → LLM → Action 校验执行（既有链路）
 ```
 
-- **FastBrain（快脑）**：5 意图规则匹配——greet（招呼）/ask_direction（问路）/ask_price（问价）/farewell（道别）/ask_time（问时）五类高频日常输入，命中即产出 SPEAK Action 0-token 秒回；规则路径为 Tier 1 级（规则与哈希），不进 LLM
+- **FastBrain（快脑）**：6 意图规则匹配——greet（招呼）/presence（确认在场：在吗/老板在吗/有人吗等高频封闭句式）/ask_direction（问路）/ask_price（问价）/farewell（道别）/ask_time（问时）六类高频日常输入，命中即产出 SPEAK Action 0-token 秒回；规则路径为 Tier 1 级（规则与哈希），不进 LLM
 - **FillerEngine（垫话）**：既有 `engine/filler.py` 反应性开场白，位于快脑判定之前（分流顺序见上）
 - **慢脑**：既有 LLM 决策链——记忆检索 → 上下文组装 → LLM → Action 校验执行
-- **接管率统计口径**：引擎属性 `fast_brain_stats = {"hits": n, "total": m}`（快脑命中数/对话总数），`status()` 含 `fast_brain` 字段；实测脚本 `scripts/fast_brain_takeover.py` 固化 12 条混合对话口径（8 条五意图高频日常 + 4 条复杂话题，seed=42 确定性复现），期望接管率 8/12 ≈ 66.7%
+- **接管率统计口径**：引擎属性 `fast_brain_stats`（快脑命中数/对话总数），`status()` 含 `fast_brain` 字段；实测双口径——`scripts/fast_brain_takeover.py` 固化 12 条混合对话（8 条高频日常 + 4 条复杂话题，seed=42 确定性复现）接管率 8/12=66.7%；`scripts/fast_brain_takeover_open.py` 非固化二次采样（13 条四类分布：冒烟复杂 3 + 已覆盖口语 4 + GAP 候选 4 + 复杂寒暄 2）接管率 8/13=61.5%，GAP 候选 4/4 拦截（审查指令 2：固化样本接管率不单独作达标证据）；另 `scripts/tone_continuity.py` 为垫话-回复语气连续性真实 LLM 采样脚本（高压垫话后慢脑不接续样本 ≤20% 验收）
 
 **2. filler 与 temperament_table 掩码 id 体系统一方案（PAD 裁定后接线）**
 
@@ -344,16 +344,16 @@ NPCEngine.tick(minutes)
 - 25 NPC 按 6D 正态属性 + 齐普夫职业分布 + 标签金字塔生成；关键 NPC（1-5%，8D 全量+把柄）vs 环境 NPC（4D 压缩稳态，零 LLM）
 - 行为经济学离散事件化（T5）：EWMA 财富基准、2.5 倍禀赋效应、损失域豪赌；杜希格习惯回路 0-token 截断
 
-### 架构图重画硬清单（T3 执行，2026-10-07 固化）
+### 架构图重画硬清单（T3 执行，2026-10-07 固化；2026-10-10 22:00 已重画完成）
 
-> 审查指令（10-06 第六次审查指令 3）要求：`docs/architecture.png` 重画必须覆盖以下组件，缺项判文档失同步。
+> 审查指令（10-06 第六次审查指令 3 + 10-09 第九次指令 3）要求：`docs/architecture.png` 重画必须覆盖以下组件，缺项判文档失同步。
 
-1. **FillerEngine 旁路组件**：`engine/filler.py` 脾气掩码×8D 状态 → 同步垫话，`player_says` 链路中慢脑调用前的 0-token 旁路（10-06 落地，图未收录）；
-2. **快慢脑分流结构**：快脑意图规则匹配（`engine/fast_brain.py` FastBrain，0-token 秒回，原型 2026-10-09 22:00 落地）与慢脑 LLM 决策链的双通道分流门（T3 主体）；
-3. **标签库层（tag_genesis + tag_mount）**：`engine/tag_genesis.py` 先天属性创生模块（6D 正态+金字塔/齐普夫分布+尧氏风格，10-07 落地）与 `engine/tag_mount.py` 标签挂载账本（缺陷/把柄/四时态/互斥锁，10-08 落地）作为决策上游的离散标签供给层；
-4. T2 主体（8 脾气掩码接入决策链）与 T4 人口学生成器若有架构级数据流新增，一并入图。
+1. **FillerEngine 旁路组件** ✅入图：`engine/filler.py` 脾气掩码×8D 状态 → 同步垫话，`player_says` 链路中慢脑调用前的 0-token 旁路（10-06 落地，图已收录）；
+2. **快慢脑分流结构** ✅入图：快脑意图规则匹配（`engine/fast_brain.py` FastBrain 六意图，0-token 秒回 + fast_brain_stats 接管率统计）与慢脑 LLM 决策链的双通道分流门，fast 绕行路径直达行动层（图已收录）；
+3. **标签库层（tag_genesis + tag_mount）** ✅入图：`engine/tag_genesis.py` 先天属性创生模块与 `engine/tag_mount.py` 标签挂载账本（生成→挂载→visible_tags→身份标签行数据流，图已收录）；
+4. **极简组装后决策上下文结构** ✅入图：决策上下文注入节点含【此刻内心】to_discrete_tags() ≤4 离散标签（替换浮点文本）四块结构（图已收录）。
 
-重画时机：T3 快慢脑分流落地引发架构实质变化时统一执行（避免阶段性反复重画）；期间以本清单与正文描述维持文档-代码一致性。
+重画执行记录：2026-10-10 22:00 统一重画（diagram-drawing 技能 + 视觉 QA 12 项全 PASS + PM 亲读四组件与代码数据流一致复核），`docs/architecture.drawio` 源文件同步更新；旧版 5D 参数向量表述已随重画失效。
 
 ### 远期研究方向（本周期禁止实施）
 

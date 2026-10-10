@@ -8,9 +8,12 @@
     1. 默认 NPCEngine(llm=MockLLMProvider())，加载全部 configs
        （chen/lily 核心 NPC，tag_profile 常驻挂载默认生效）；
     2. 12 条混合对话逐条 player_says：
-       - 前 8 条 = 快脑可接管的高频日常意图，覆盖 FastBrain
-         全部 5 类意图（greet 招呼 / ask_direction 问路 /
-         ask_price 问价 / farewell 道别 / ask_time 问时）；
+        - 前 8 条 = 快脑可接管的高频日常意图，覆盖固化口径五类意图
+          （greet 招呼 / ask_direction 问路 / ask_price 问价 /
+          farewell 道别 / ask_time 问时；presence 确认为 2026-10-10
+          22:00 PM 裁定新增的第六意图，由非固化口径
+          scripts/fast_brain_takeover_open.py 覆盖——固化 12 条不含
+          presence 句，66.7% 口径不变）；
        - 后 4 条 = 复杂话题（token_baseline.py 同款 4 句，
          Mock 话题库可命中，期望走慢脑 LLM 决策链）；
     3. 逐条读分流路径，统计：

@@ -4,6 +4,13 @@ import json, os
 from dataclasses import dataclass, asdict
 from typing import Any, Dict, List, Optional
 
+# T4-a token 裁剪之二配套：类型权重保底桶——血缘/师徒类关系不因
+# |affinity| 低被挤出 prompt top-3（低好感父亲依然是父亲）。
+_PRIORITY_RELATION_TYPES = frozenset({
+    "父亲", "母亲", "儿子", "女儿", "兄长", "弟弟", "姐姐", "妹妹",
+    "兄弟", "姐妹", "丈夫", "妻子", "师父", "师傅", "徒弟", "师娘",
+})
+
 
 @dataclass
 class Relationship:
@@ -47,6 +54,13 @@ class RelationshipNetwork:
     def to_prompt_text(self, source_id: str) -> str:
         """生成注入 LLM 决策上下文的关系描述文本。无关系时返回空字符串。
 
+        T4-a token 裁剪之二：top-3 截断 + 类型权重保底。全部出边分两桶
+        ——relation ∈ _PRIORITY_RELATION_TYPES（血缘/师徒）为保底桶，
+        普通关系为普通桶；两桶内各自按 |affinity| 降序稳定排序（同分
+        保持插入原序），保底桶在前、普通桶在后；拼接后总数超过 3 条
+        截断为 3 条。类型权重保底：父子/师徒类关系不因 |affinity| 低
+        被挤出（低好感父亲依然是父亲）。
+
         格式示例：
         【人际关系】
         你的父亲是老张（好感 0.9）
@@ -55,8 +69,14 @@ class RelationshipNetwork:
         rels = self.query(source_id)
         if not rels:
             return ""
+        priority = sorted(
+            (r for r in rels if r.relation in _PRIORITY_RELATION_TYPES),
+            key=lambda r: abs(r.affinity), reverse=True)
+        normal = sorted(
+            (r for r in rels if r.relation not in _PRIORITY_RELATION_TYPES),
+            key=lambda r: abs(r.affinity), reverse=True)
         lines = []
-        for r in rels:
+        for r in (priority + normal)[:3]:
             name = r.target_name or r.target_id
             if r.affinity > 0.3:
                 desc = f"好感 {r.affinity:.1f}"

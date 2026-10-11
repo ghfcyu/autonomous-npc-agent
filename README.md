@@ -35,9 +35,9 @@ AIGC:
 - **外观与环境状态**：实体拥有可变外观（穿着/姿势），换装作为 `appearance_change` 事件发布，同地点 NPC 感知写入记忆、异地无感知；决策上下文注入【周围的人】块——NPC 对话能"看见"并引用对方穿着（"你今天穿着围裙"）
 - **垫话引擎**：慢脑 LLM 调用前**同步返回反应性垫话占位**（`player_says` 结果含 `filler` 字段）——脾气掩码（chen 暴躁/lily 喜悦等 3 掩码先行）× 8D 当下状态双驱动：铁匠陈压力过载时垫话带烦躁语气（"（皱眉）找老夫何事？"）、心情好时是常态反应，同一 NPC 不同状态下开场白可感知分叉；0-token 本地计算不进 LLM prompt，T2 落地 8 脾气掩码后替换标准掩码表
 - **快脑分流（T3）**：`engine/fast_brain.py` 六意图（greet 招呼/presence 确认在场/ask_direction 问路/ask_price 问价/farewell 道别/ask_time 问时）规则匹配，命中直接产出 SPEAK Action **0-token 秒回**（跳过慢脑 LLM 决策链）；`player_says` 返回 `brain` 字段（fast/slow）标注分流路径，`fast_brain_stats` 接管率统计（`status()` 含 `fast_brain` 字段）；presence 为非固化采样数据驱动扩充（2026-10-10：「在吗/老板在吗」类高频封闭句式原先白付约 1200 prompt token 的 LLM 调用只为回一个"在"字）；实测脚本：`scripts/fast_brain_takeover.py` 固化口径（12 条混合对话 66.7%，验收线 ≥50%）+ `scripts/fast_brain_takeover_open.py` 非固化二次采样（13 条四类分布 61.5%，GAP 候选 4/4 拦截）
-- **小村庄世界**：地点按"店铺/公共空间/居所"三类组织为可探索结构（`configs/locations.json` 配置化，内置默认 17 地点），NPC 扩至 10 个且全部配置化（各有居所/作息/职业/社会关系），作息表驱动 NPC 在居所与工作地间按时间移动（核心+背景 NPC 均参与）；新增以背景 NPC 为主（零 LLM），核心 NPC 仍跑完整决策链——村庄有人气但不增 token 成本
-- **人口学村庄生成器（T4 第一小步已落地）**：`engine/village_genesis.py` 25 人花名册按齐普夫职业阶层（farming 7/craft 5/特殊职业各 ≤2）+ 6D 正态先天属性 + 金字塔缺陷/把柄挂载（复用 `build_genesis_ledger` 单一挂载内核，crc32(npc_id) 确定性、与引擎常驻化同源）生成村民人口学档案；关键 NPC 2 人（chen/lily，8D 全量）vs 环境 NPC 23 人（4D 压缩稳态 EnvMind，Tier 0/1 封印零 LLM）分层；15 位新住民（赵家三口/牧人/磨坊主/私塾先生/学童/更夫等）配置落位 `configs/village_roster/`（共居消化居所增速、更夫夜班作息反转、牧人 04:00 早出），待 T4-a 地点扩容后正式接入运转；生成器为纯离线数据层不进运行时 prompt，正态/齐普夫/金字塔三形状分布断言全部可测
-- **Token 经济性度量与主动削减**：LLM Provider 上报每次调用的 token 用量（`last_usage`：prompt/completion/total_tokens），`NPCEngine` 按 NPC 聚合统计（`token_stats`），`status()` 暴露 token 报告字段——背景 NPC 零 LLM 以 token 数（非调用次数）可断言、可度量、可对比趋势；token 趋势：上下文裁剪下降 4435→4660→4553，T1 8D 基底重构后 4737→4769（身份标签行合法增量），**T3 极简组装（<35token 规范落地）后 4501**——【此刻内心】行从 8 参数浮点文本改为 ≤4 个离散中文标签，结构性下降 268；seed=42 确定性可复现
+- **小村庄世界（T4-a 已接入运转）**：地点按"店铺/公共空间/居所/作业场所"四类组织为可探索结构（`configs/locations.json` 配置化，内置默认 33 地点：shop 5 / public 4 / residence 19 / work 5——农田/河畔/牧场/磨坊/木匠铺为 T4-a 新类别），NPC 达 25 个且全部配置化（各有居所/作息/职业/社会关系：赵宅三口共居/药童寄宿师门/学童寄宿私塾/更夫 20:00-03:00 夜班巡村/牧人 04:00 早出），作息表驱动 NPC 在居所与工作地间按时间移动（核心+背景 NPC 均参与，白天农田/河畔/牧场各有其人、夜间村民归宅、更夫巡村——昼夜分布图成形）；23 位环境 NPC 全部零 LLM，核心 NPC 仍跑完整决策链——村庄有人气但不增 token 成本；环境事件池 46 条覆盖 25 NPC 全员（世界自发的职业生活涟漪）
+- **人口学村庄生成器（T4）**：`engine/village_genesis.py` 25 人花名册按齐普夫职业阶层（farming 7/craft 5/特殊职业各 ≤2）+ 6D 正态先天属性 + 金字塔缺陷/把柄挂载（复用 `build_genesis_ledger` 单一挂载内核，crc32(npc_id) 确定性、与引擎常驻化同源）生成村民人口学档案；关键 NPC 2 人（chen/lily，8D 全量）vs 环境 NPC 23 人（4D 压缩稳态 EnvMind，Tier 0/1 封印零 LLM）分层；15 位新住民配置 `configs/village_roster/` 于 T4-a（2026-10-11）经 `load_newcomer_configs()` 正式接入引擎运转（生产/演示路径自动加载，共 23 背景 NPC）；生成器为纯离线数据层不进运行时 prompt，正态/齐普夫/金字塔三形状分布断言全部可测
+- **Token 经济性度量与主动削减**：LLM Provider 上报每次调用的 token 用量（`last_usage`：prompt/completion/total_tokens），`NPCEngine` 按 NPC 聚合统计（`token_stats`），`status()` 暴露 token 报告字段——背景 NPC 零 LLM 以 token 数（非调用次数）可断言、可度量、可对比趋势；token 趋势：上下文裁剪下降 4435→4660→4553，T1 8D 基底重构后 4737→4769（身份标签行合法增量），T3 极简组装（<35token 规范落地）后 4501（结构性下降 268），T4-a 25 NPC 接入运转后 4523（运转噪声合法波动 +22，容忍带内）；两项 T4-a 密度护栏：【周围的人】nearby 亲缘度排序取前 5（`NEARBY_PROMPT_LIMIT`）+【人际关系】top-3 截断与血缘/师徒保底（低好感父亲依然是父亲）；seed=42 确定性可复现
 - **<35token 极简组装（T3 已落地）**：进慢脑 prompt 的只有 3-4 个高显著度离散中文标签（`InnerState.to_discrete_tags()`：按偏离幅度降序取 top4，全常带为"心境平稳"），阈值常量 `BAND_*` 全仓单一来源（filler.py 掩码同源），严禁浮点向量/参数表进 prompt，红线预防测试固化
 - **可靠性护栏**：动作白名单 + 状态机校验 + 内状态硬约束，LLM 输出经过验证器过滤，异常时安全回退
 - **零依赖内核**：engine 核心仅使用 Python 标准库；FastAPI 服务为可选层
@@ -114,9 +114,9 @@ autonomous-npc-agent/
 │       └── mock.py        # 离线 Mock（开发/测试用）
 ├── configs/npcs/          # 核心 NPC 人格配置（JSON，热加载）
 ├── configs/background_npcs/  # 背景 NPC 配置（JSON）
-├── configs/village_roster/   # T4 新住民配置（15 位新村民，随地点扩容接入）
+├── configs/village_roster/   # T4 新住民配置（15 位新村民，T4-a 已接入运转）
 ├── configs/relationships.json  # NPC 关系网络配置
-├── configs/locations.json     # 村庄地点配置（三类可探索结构）
+├── configs/locations.json     # 村庄地点配置（四类可探索结构，33 地点）
 ├── api/server.py          # FastAPI 服务（可选）
 ├── demo/index.html        # 2D 可视化演示端
 ├── scripts/run_demo.py    # CLI REPL 演示
@@ -144,7 +144,8 @@ autonomous-npc-agent/
 python3 -m unittest discover -s tests -v
 ```
 
-覆盖：记忆读写与巩固、事件驱动长期写入、玩家送礼闭环、事件总线、状态机迁移约束、动作白名单校验、LLM 异常输出回退、引擎端到端闭环、量化内状态参数变化、标签行为影响、内状态硬约束（压力/疲劳阈值拒绝）、疲劳随时间变化与恢复、随机事件槽累积与触发、环境事件 NPC 感知与确定性测试、背景 NPC 规则反应与零 LLM 调用断言、关系网络 CRUD 与决策上下文注入、外观状态更新与事件发布契约、NPC 感知位置过滤（同地可见/异地不可见）、对话上下文的外观引用与 token 经济性（空 nearby 不注入）、村庄规模与运转（NPC≥10/地点≥15 三类齐全/全员居所注册/背景 NPC 零 LLM/全村庄 tick 推进/status 全村庄覆盖）、作息驱动位置移动（SLEEPING 移居所/WORKING 移工作地/IDLE 保持原位/核心+背景 NPC 均参与/全天运转后 token 基线对比）、Token 度量基线（Mock 字符数估算/OpenAI usage 解析/背景 NPC 零 token 断言/status token_stats 字段）、Mock 话题匹配范围修复（仅扫描【玩家说】段，地点名与外观文本不误触发）、环境事件池覆盖全部 10 NPC（16 条自发事件 + 对抗性池-常量锁 + 背景NPC事件感知回流）、上下文裁剪对抗性测试（RECENT_CONTEXT_WINDOW=4 常量锁 + 最多4条断言 + 最新4条顺序验证）、Token 基线确定性测试（random.seed(42) 固定天气随机 + 多次运行结果一致 + PINNED_TOTAL_TOKENS=4501 口径锁，变更史：4769→4501 极简组装结构性下降 2026-10-10）、先天属性创生分布断言（6D 正态均值/σ/值域、财富对数正态中位数与长尾、金字塔 70/20/8/2、尧氏 32 组合全覆盖、齐普夫频率-理论一致、规范契约锁：参数硬编码比对+零第三方依赖）、人口学村庄生成器断言（花名册结构锁 25 人/齐普夫职业长尾非平顶、正态大样本均值与 σ 带宽、金字塔分档大样本占比、关键-环境分层与 EnvMind 常人平稳带、批量挂载与引擎常驻化同源（chen 缺陷/把柄双源全等）、15 份新住民配置完整性与共居/夜班/早出锁定、17 实体全天 24 tick 零 LLM 零 token 双口径、慢脑 token 归属仅核心、叙事摘要含身份与缺陷把柄标签）。
+覆盖：记忆读写与巩固、事件驱动长期写入、玩家送礼闭环、事件总线、状态机迁移约束、动作白名单校验、LLM 异常输出回退、引擎端到端闭环、量化内状态参数变化、标签行为影响、内状态硬约束（压力/疲劳阈值拒绝）、疲劳随时间变化与恢复、随机事件槽累积与触发、环境事件 NPC 感知与确定性测试、背景 NPC 规则反应与零 LLM 调用断言、关系网络 CRUD 与决策上下文注入、外观状态更新与事件发布契约、NPC 感知位置过滤（同地可见/异地不可见）、对话上下文的外观引用与 token 经济性（空 nearby 不注入）、村庄规模与运转（NPC≥10/地点≥15 三类齐全/全员居所注册/背景 NPC 零 LLM/全村庄 tick 推进/status 全村庄覆盖）、作息驱动位置移动（SLEEPING 移居所/WORKING 移工作地/IDLE 保持原位/核心+背景 NPC 均参与/全天运转后 token 基线对比）、Token 度量基线（Mock 字符数估算/OpenAI usage 解析/背景 NPC 零 token 断言/status token_stats 字段）、Mock 话题匹配范围修复（仅扫描【玩家说】段，地点名与外观文本不误触发）、环境事件池覆盖全部 10 NPC（16 条自发事件 + 对抗性池-常量锁 + 背景NPC事件感知回流）、上下文裁剪对抗性测试（RECENT_CONTEXT_WINDOW=4 常量锁 + 最多4条断言 + 最新4条顺序验证）、Token 基线确定性测试（random.seed(42) 固定天气随机 + 多次运行结果一致 + PINNED_TOTAL_TOKENS=4523 口径锁，变更史：4769→4501 极简组装结构性下降 2026-10-10、4501→4523 T4-a 25 NPC 接入运转噪声 2026-10-11）、先天属性创生分布断言（6D 正态均值/σ/值域、财富对数正态中位数与长尾、金字塔 70/20/8/2、尧氏 32 组合全覆盖、齐普夫频率-理论一致、规范契约锁：参数硬编码比对+零第三方依赖）、人口学村庄生成器断言（花名册结构锁 25 人/齐普夫职业长尾非平顶、正态大样本均值与 σ 带宽、金字塔分档大样本占比、关键-环境分层与 EnvMind 常人平稳带、批量挂载与引擎常驻化同源（chen 缺陷/把柄双源全等）、15 份新住民配置完整性与共居/夜班/早出锁定、17 实体全天 24 tick 零 LLM 零 token 双口径、慢脑 token 归属仅核心、叙事摘要含身份与缺陷把柄标签）、T4-a 村庄接入运转断言（25 NPC/26 实体规模锁、33 地点四类分布 residence 19/shop 5/work 5/public 4、12 组工作地映射（农夫在农田/渔夫在河畔）、共居落位（赵宅 4 口/大夫宅/学塾宅/孙家）、更夫跨午夜夜班反转+牧人早出、全天运转零 LLM 双口径、事件池 25/25 全员覆盖+首项轮播锚、nearby 亲缘度排序取前 5（7 实体同地恰 5 行+高亲缘居前）、关系 top-3+血缘师徒保底对抗性（低好感父亲不被挤出）、商品词品类后缀边界（铁剑鞘不得提取铁剑+问什么答什么回归）、新地点问路快脑）。
+
 
 ```bash
 # T4 人口学档案一瞥（确定性生成，离线零 LLM）
@@ -165,7 +166,7 @@ python3 -c "from engine.village_genesis import generate_village, describe_villag
 - [x] **T1 心智 v2** 8D 正交心智基底（4D 生理稳态 + 3D PAD 心境 + 1D 压力）+ 荀子六情事件→PAD 矢量映射器 + trust 迁移关系网（主体 2026-10-06；收尾 2026-10-07：六情矢量方向归正跟随规范+矢量-规范契约锁测试）
 - [ ] **T2 标签库 v2** 6D 先天正态属性 + 林传鼎 8 显性脾气掩码 + 尧氏 8 风格×4 阶执念 + 缺陷/把柄强制挂载 + 金字塔长尾分布（首批已落地 2026-10-07：`engine/tag_genesis.py` 生成器+分布断言+规范契约锁 32 用例；第二批已落地 2026-10-08：`engine/tag_mount.py` 缺陷+把柄强制挂载+四时态+互斥锁 32 用例 + `engine/temperament_table.py` 8 脾气双值域分区表 33 用例；收口先行批已落地 2026-10-09：chen/lily 挂载常驻化（configs 声明 `tag_profile: "genesis"` + `spawn` 自动挂载 + token 基线 4737→4769 合法增量，`tests/test_tag_residency.py` 15 用例）；余项：PAD 裁定后 8 掩码接线 filler、chen/lily 重配）
 - [ ] **T3 快慢脑** 意图规则 0-token 秒回 + 脾气掩码垫话引擎 + <35 token 极简 Prompt 组装（垫话引擎原型已先行落地 2026-10-06：3 脾气掩码×8D 状态双驱动，`filler` 字段接入 `player_says`，真实 LLM 冒烟通过；快脑已落地：六意图 0-token 秒回（2026-10-10 presence 数据驱动扩充）+ `player_says` `brain` 字段分流接线 + `fast_brain_stats` 接管率统计（固化 66.7%/非固化 61.5%）+ <35 token 极简组装落地（token 4769→4501）+ 语气连续性真实 LLM 验收（0/5 不接续 ≤20% 线）；余项：PAD 裁定后 8 掩码 id 统一接线）
-- [ ] **T4 人口学村庄** 25 NPC 按正态属性 + 齐普夫职业分布生成，关键 NPC 与环境 NPC 双轨分流（第一小步已落地 2026-10-11：`engine/village_genesis.py` 25 人花名册+人口学档案生成器+`build_genesis_ledger` 单一挂载内核提取+15 位新住民配置 `configs/village_roster/`，三形状分布断言 40 用例；下一步 T4-a：地点 17→33 扩容+新住民正式接入运转+事件池 25/25）
+- [ ] **T4 人口学村庄** 25 NPC 按正态属性 + 齐普夫职业分布生成，关键 NPC 与环境 NPC 双轨分流（第一小步已落地 2026-10-11：`engine/village_genesis.py` 25 人花名册+人口学档案生成器+`build_genesis_ledger` 单一挂载内核提取+15 位新住民配置，三形状分布断言 40 用例；**T4-a 已落地 2026-10-11 22:00：地点 17→33 四类扩容（work 新类别：农田/河畔/牧场/磨坊/木匠铺）+15 新住民接入运转（23 背景 NPC）+事件池 46 条 25/25 全员覆盖+nearby≤5+关系 top-3 两项 token 裁剪+商品词品类后缀边界，30 用例**；余项 T4-b：4D 压缩稳态行为消费+关键 NPC 升级评估）
 - [ ] **T5 行为经济学** 杜希格习惯回路 0-token 截断 + EWMA 财富基准 + 禀赋效应
 - [ ] **T6 把柄玩法** 把柄勒索博弈 + 醉酒结算 + 瞬态标签生命周期
 - [ ] **L4** 多智能体社会（NPC 互聊、关系网深化、信息传播）

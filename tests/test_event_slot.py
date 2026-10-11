@@ -14,7 +14,8 @@ from engine.llm.mock import MockLLMProvider
 from engine.npc import Persona
 from engine.world import EventSlot, World, WorldEvent
 
-# World 默认环境事件池（engine/world.py 中的契约顺序）
+# World 默认环境事件池头部（engine/world.py 中的契约顺序；T4-a 扩容后
+# 尾部追加 15 条新住民事件，本常量锁既有 17 条头部不变——轮播确定性锚）
 DEFAULT_POOL = [
     {"actor": "chen", "summary": "铁匠陈想起该去收矿石了"},
     {"actor": "lily", "summary": "莉莉盘算着新货的报价"},
@@ -160,15 +161,18 @@ class TestWorldEventSlot(unittest.TestCase):
         self.assertEqual(summary_a, DEFAULT_POOL[0]["summary"])
 
     def test_env_event_cycles_through_pool(self):
+        # T4-a 事件池扩容（17 → ≥32，尾部追加）：轮播周期改为动态取实际
+        # 池长——池长变化不破坏轮播语义（按 trigger_count 取模回到池首）
         world = World()
         world.event_slot = EventSlot(step=0.05, threshold=0.05)  # 每次 tick 必触发
-        total = len(DEFAULT_POOL)
+        pool = list(World._DEFAULT_ENV_EVENTS)
+        total = len(pool)
         for _ in range(total + 1):
             world.tick()
         summaries = [e.payload["summary"] for e in env_events_in(world.bus)]
         self.assertEqual(len(summaries), total + 1)
         # 按事件池顺序轮播，最后一轮回到池首
-        expected = [d["summary"] for d in DEFAULT_POOL]
+        expected = [d["summary"] for d in pool]
         self.assertEqual(summaries, expected + [expected[0]])
 
     def test_accumulate_event_slot_method(self):
@@ -277,10 +281,14 @@ class TestEventPoolCoverage(unittest.TestCase):
         self.assertGreaterEqual(len(World._DEFAULT_ENV_EVENTS), 10)
 
     def test_pool_default_matches_test_constant(self):
-        """world.py 的 _DEFAULT_ENV_EVENTS 与测试常量 DEFAULT_POOL 完全一致。"""
+        """world 池头部与 DEFAULT_POOL 完全一致（既有 17 条顺序不变——
+        轮播确定性锚）；T4-a 尾部追加 15 条新住民事件后总数 ≥32。"""
         world_pool = list(World._DEFAULT_ENV_EVENTS)
-        self.assertEqual(len(world_pool), len(DEFAULT_POOL))
-        for w, t in zip(world_pool, DEFAULT_POOL):
+        self.assertGreaterEqual(len(world_pool), 32,
+                                msg="T4-a 事件池扩容后应 ≥32 条")
+        head = world_pool[:len(DEFAULT_POOL)]
+        self.assertEqual(len(head), len(DEFAULT_POOL))
+        for w, t in zip(head, DEFAULT_POOL):
             self.assertEqual(w, t)
 
 
@@ -317,9 +325,11 @@ class TestBackgroundNPCEventPerception(unittest.TestCase):
         ]), "chen 在 forge 不应感知 bakery 发生的事件")
 
     def test_farmer_zhao_event_perceived_at_same_location(self):
-        """farmer_zhao 在 plaza，guard_wang 也在 plaza。
-        手动触发 farmer_zhao 的事件，guard_wang 应产生规则反应（npc_action）。
-        """
+        """T4-a 后 farmer_zhao 工作地为农田（farm）。把 guard_wang 移到
+        farm 与其同地，手动触发 farmer_zhao 的事件，guard_wang 应产生
+        规则反应（npc_action）——同地背景 NPC 对环境事件反应的语义
+        不因工作地迁移而改变。"""
+        self.engine.world.move_entity("guard_wang", "farm")
         self.engine.world.bus.publish(WorldEvent(
             0, "env_event", "farmer_zhao",
             {"summary": "赵老汉蹲在田埂上看了看天色"}
@@ -328,7 +338,7 @@ class TestBackgroundNPCEventPerception(unittest.TestCase):
         actions = [e for e in self.engine.world.bus.history
                    if e.kind == "npc_action" and e.actor == "guard_wang"]
         self.assertTrue(len(actions) > 0,
-                        "guard_wang 在 plaza 应对同地点的 farmer_zhao 事件产生规则反应")
+                        "guard_wang 在 farm 应对同地点的 farmer_zhao 事件产生规则反应")
 
 
 if __name__ == "__main__":

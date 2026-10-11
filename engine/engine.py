@@ -19,6 +19,7 @@ from .llm.base import BaseLLMProvider
 from .npc import NPC, Persona
 from .relationships import RelationshipNetwork
 from .states import NPCState
+from .village_genesis import load_newcomer_configs
 from .world import Entity, World, WorldEvent
 
 DEFAULT_BG_CONFIG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -59,14 +60,18 @@ class NPCEngine:
         for persona in (npc_configs if npc_configs is not None else Persona.load_all()):
             self.spawn(persona)
 
-        # 生成背景 NPC：显式传入配置时完全按传入值；全默认构造（生产/演示路径）
-        # 时自动加载 configs/background_npcs/；显式传入自定义 npc_configs（测试/
-        # 嵌入场景）时不隐式注入，保证场景可控。
+        # 生成背景 NPC：显式传入配置时完全按传入值；全默认构造（生产/
+        # 演示路径）时自动加载 configs/background_npcs/ 并接入
+        # configs/village_roster/ 的 15 位新住民（T4-a 正式接入运转，
+        # 共 23 背景 NPC）；显式传入自定义 npc_configs（测试/嵌入场景）
+        # 时不隐式注入，保证场景可控（既有语义零变化）。
+        # load_newcomer_configs 复用 village_genesis 单一来源，
+        # 不在本模块复制目录扫描逻辑（两套扫描漂移=共线性死穴）。
         self.background_npcs: Dict[str, BackgroundNPC] = {}
         if background_configs is not None:
             bg_configs = background_configs
         elif npc_configs is None:
-            bg_configs = self._load_bg_configs()
+            bg_configs = self._load_bg_configs() + load_newcomer_configs()
         else:
             bg_configs = []
         for config in bg_configs:

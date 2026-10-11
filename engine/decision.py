@@ -32,6 +32,10 @@ OUTPUT_CONTRACT = """你只能输出一个 JSON 对象（不要输出任何其�
 
 _JSON_RE = re.compile(r"\{.*\}", re.DOTALL)
 
+# T4-a token 裁剪之一：【周围的人】渲染行数上限（25 NPC 落地后同地点
+# 密度上升的护栏——按亲缘度优先保留玩家最相关的人，其余截断不进 prompt）。
+NEARBY_PROMPT_LIMIT = 5
+
 
 class DecisionEngine:
     """单个 NPC 的决策引擎。"""
@@ -91,11 +95,24 @@ class DecisionEngine:
             # <35token 极简组装：只注入 ≤4 个高显著度离散中文标签
             # （顿号连接），严禁浮点数字/参数表出现在该行。
             state_line = f"【此刻内心】{'、'.join(inner_state.to_discrete_tags())}\n"
-        # 周围的人：同地点可见的实体及其外观（空 nearby 不注入，控 token）
+        # 周围的人：同地点可见的实体及其外观（空 nearby 不注入，控 token）。
+        # T4-a token 裁剪之一：25 NPC 落地后同地点密度上升护栏——先按
+        # viewer（persona.id）与各实体的关系亲缘度 |affinity| 降序稳定
+        # 排序（无关系记 0.0；同分保持 snapshot 原序），再取前
+        # NEARBY_PROMPT_LIMIT 行渲染，亲缘度最低的截断不进 prompt。
         nearby_line = ""
         if snapshot.get("nearby"):
+            def _affinity(entity_id: str) -> float:
+                if self.relationships is None:
+                    return 0.0
+                rel = self.relationships.get_relation_to(self.persona.id, entity_id)
+                return rel.affinity if rel is not None else 0.0
+
+            ordered = sorted(snapshot["nearby"],
+                             key=lambda e: abs(_affinity(e["id"])),
+                             reverse=True)
             rows = []
-            for e in snapshot["nearby"]:
+            for e in ordered[:NEARBY_PROMPT_LIMIT]:
                 if e.get("appearance"):
                     look = "、".join(f"{APPEARANCE_KEY_CN.get(k, k)}{v}"
                                      for k, v in e["appearance"].items())

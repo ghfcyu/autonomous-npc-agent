@@ -30,7 +30,7 @@ AIGC:
 
 - **EventSlot**（G3）：世界随机事件槽，每次交互/时间推进累积 +5%，满 100% 触发一个环境事件并归零。事件体现"NPC 有自己生活"（如铁匠陈想起该去收矿石了），通过 `_publish_env_event()` 确定性选择（基于 trigger_count 取模）并发布 `env_event` 类型事件，同地点 NPC 感知并写入短期记忆
 - **Entity.appearance**（G5）：实体可变外观（`outfit` 穿着 / `posture` 姿势 / `expression` 神情），`World.set_appearance()` 按键合并更新并发布 `appearance_change` 事件；快照 `nearby` 携带各实体外观副本。设计语义是"眼睛不是记忆"：同地点可见、异地不可见（既有感知过滤天然实现），importance 0.3 不直写长期记忆
-- **Location.category**（G6）：地点分类（`shop` 店铺 / `public` 公共空间 / `residence` 居所），支撑村庄可探索结构。`World` 默认从 `configs/locations.json` 加载地点清单（文件缺失/损坏/空列表回退内置默认 17 地点：5 店铺 + 2 公共 + 10 居所），测试可显式传 `locations=` 覆盖。`World.snapshot` 仍是局部感知（仅同地点实体），`NPCEngine.status` 的 `world.locations` 遍历全村庄用于总览展示
+- **Location.category**（G6/T4-a）：地点分类（`shop` 店铺 / `public` 公共空间 / `residence` 居所 / `work` 作业场所——T4-a 新类别：农田/河畔/牧场/磨坊/木匠铺），支撑村庄可探索结构与 25 NPC 工作地映射。`World` 默认从 `configs/locations.json` 加载地点清单（文件缺失/损坏/空列表回退内置默认 33 地点：5 店铺 + 4 公共 + 19 居所 + 5 作业场所），测试可显式传 `locations=` 覆盖。`World.snapshot` 仍是局部感知（仅同地点实体），`NPCEngine.status` 的 `world.locations` 遍历全村庄用于总览展示
 
 ### 2. 记忆层（`engine/memory.py`）
 
@@ -147,7 +147,7 @@ WorldEvent（事件总线发布）
 
 - `Persona`：JSON 配置 → 人格对象（性格、背景、语气、对话库、作息表、**标签**、**外观**、**居所**、**脾气掩码 temperament**——垫话引擎的掩码标识，T2 落地 8 掩码后由标签库生成）
 - `NPC`：人格 + 记忆系统 + 状态机 + 决策引擎 + **内状态** 的聚合根，订阅事件总线（记忆写入 + 状态更新双订阅）
-- `NPCEngine`：世界 + NPC 集合的编排入口，暴露 `player_says / player_gives / player_changes_appearance / tick / status` 五个核心 API（`player_gives`：玩家送礼，库存转移或宽松发布事件，NPC 经事件链路记入短期+长期记忆；`player_changes_appearance`：玩家换装，同地点 NPC 感知；`tick`：推进世界时间并对核心+背景 NPC 应用作息驱动位置移动）。全默认构造时自动扫描 `configs/`（npcs + background_npcs + relationships + locations），加载小村庄：2 核心 NPC（chen/lily 跑完整决策链）+ 8 背景 NPC（零 LLM 规则反应）+ 17 地点（三类可探索）。`player_says` 后按 NPC 聚合 token 统计（`token_stats`），`status()` 返回 `token_stats` 字段（`by_npc` 按 NPC 聚合 prompt/completion/total/calls，`total_tokens` 为 LLM 累计，`llm_calls` 为调用次数）
+- `NPCEngine`：世界 + NPC 集合的编排入口，暴露 `player_says / player_gives / player_changes_appearance / tick / status` 五个核心 API（`player_gives`：玩家送礼，库存转移或宽松发布事件，NPC 经事件链路记入短期+长期记忆；`player_changes_appearance`：玩家换装，同地点 NPC 感知；`tick`：推进世界时间并对核心+背景 NPC 应用作息驱动位置移动）。全默认构造时自动扫描 `configs/`（npcs + background_npcs + village_roster + relationships + locations），加载小村庄：2 核心 NPC（chen/lily 跑完整决策链）+ 23 背景 NPC（8 既有 + 15 新住民，零 LLM 规则反应，T4-a 正式接入运转）+ 33 地点（四类可探索结构，含 work 作业场所新类别）。`player_says` 后按 NPC 聚合 token 统计（`token_stats`），`status()` 返回 `token_stats` 字段（`by_npc` 按 NPC 聚合 prompt/completion/total/calls，`total_tokens` 为 LLM 累计，`llm_calls` 为调用次数）
 
 ## 数据流（一次对话）
 
@@ -344,6 +344,7 @@ NPCEngine.tick(minutes)
 - 25 NPC 按 6D 正态属性 + 齐普夫职业分布 + 标签金字塔生成；关键 NPC（8D 全量+把柄）vs 环境 NPC（4D 压缩稳态，零 LLM）
 - 行为经济学离散事件化（T5）：EWMA 财富基准、2.5 倍禀赋效应、损失域豪赌；杜希格习惯回路 0-token 截断
 - **第一小步已落地（2026-10-11）**：`engine/village_genesis.py` 离线人口学生成器——25 人齐普夫职业阶层花名册（farming 7 / craft 5 / 特殊职业各 ≤2）+ `generate_village()` 确定性人口学档案（crc32(npc_id) 种子）；关键 NPC 2 人（chen/lily，mind=None，8D 全量由运行时 InnerState 承载）vs 环境 NPC 23 人（`EnvMind` 4D 压缩稳态：p_fatigue/p_hunger/e_P/S_stress 字段名与 8D 严格同名——共线性纪律，常人平稳带初值，Tier 0/1 封印不进任何 prompt）；**单一挂载内核纪律**：原 `NPCEngine._build_tag_ledger` 主体提取为 `tag_mount.build_genesis_ledger`（engine 薄壳委托、签名行为零变化），引擎常驻化 / mount_tags 显式 API / village_genesis 三方复用同一函数（chen 缺陷/把柄挂载双源全等有测试锁）；15 位新住民配置落位 `configs/village_roster/`（共居消化居所增速：赵宅 3 口/药童寄宿秦家/帮工寄宿孙家/学童寄宿私塾宅；更夫 20:00-03:00 夜班作息反转、牧人 04:00 早出），生产路径暂不自动加载——待 T4-a 地点扩容（17→33，NEW_LOCATION_IDS 14 个引用清单）后正式接入运转；正态/齐普夫/金字塔三形状分布断言+环境零 LLM 双口径见 `tests/test_village_genesis.py`（40 用例）；生成器为纯离线数据层，token 基线 4501 零影响
+- **第二小步（T4-a）已落地（2026-10-11 22:00）**：地点 17→**33** 四类扩容——`work` 作业场所新类别 5 处（pasture 牧场/farm 农田/river 河畔/mill 磨坊/carpentry 木匠铺，修复"农夫在广场、渔夫在井边工作"叙事缺陷：farmer_zhao→farm、fisher_zhou→river）+ public 扩至 4（school 私塾/shrine 祠堂）+ residence 扩至 19（9 新居所共居环带，实际唯一居所 19 与提案预估 21 的偏差源：长工住东家 farmhand_sun→house_zhao、帮工住老板家 tavern_aman→house_sun 的额外共居消化，更真实的村落设定）；**15 新住民正式接入运转**：`NPCEngine` 生产/演示路径自动 `load_newcomer_configs()`（复用 village_genesis 单一来源，共 23 背景 NPC），白天农田/河畔/牧场各有其人、21:00 更夫巡村+赵家四口归宅、03:00 更夫收工回家的昼夜分布图成形；**事件池 46 条 25/25 全员覆盖**（15 新住民每人 2 条职业生活文案，尾部追加保轮播首项不变）；**两项 T4-a token 裁剪**：①【周围的人】nearby 按 viewer 亲缘度 |affinity| 降序稳定排序取前 5（`decision.py NEARBY_PROMPT_LIMIT`）——25 NPC 同地点密度护栏；②【人际关系】top-3 截断+类型权重保底（`relationships.py _PRIORITY_RELATION_TYPES`：父子/师徒不因 |affinity| 低被挤出，低好感父亲依然是父亲）；快脑商品词品类后缀边界收紧（`fast_brain.py _GOODS_SUFFIX_CHARS`：「铁剑鞘」不得提取"铁剑"答非所问）；token 基线 4501→4523（运转噪声合法波动 +22，容忍带内，PINNED 同步）；接入运转验收见 `tests/test_village_integration.py`（12 测试类 30 用例：规模/工作地映射/共居/夜班/全天运转/零 LLM 双口径/事件池覆盖/两项裁剪/商品边界/新地点问路）；架构图已同步重画（village_genesis 创生层+接入箭头入图，视觉 QA 8 项全 PASS）
 
 ### 架构图重画硬清单（T3 执行，2026-10-07 固化；2026-10-10 22:00 已重画完成）
 

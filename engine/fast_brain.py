@@ -222,6 +222,11 @@ _ROLE_GOODS: Dict[str, frozenset] = {
 }
 _DEFAULT_PRICE = "看货定价，童叟无欺。"
 
+# 品类后缀单字集合（审查第十次指令 3②）：商品词命中处紧邻的后一个
+# 字符若为其中之一，该命中视为复合品（如「铁剑鞘」不是「铁剑」），
+# 跳过不提取——问「铁剑鞘多少钱」不得答铁剑价，回通用句。
+_GOODS_SUFFIX_CHARS = "鞘柄套盒架扣绳垫钩"
+
 
 def _compass_word(dx: int, dy: int) -> str:
     """坐标差 → 中文方位（东/南/西/北/东南/东北/西南/西北）。"""
@@ -257,10 +262,22 @@ def _content_farewell(npc: "NPC", world: "World", query: str) -> str:
 
 
 def _goods_in_text(text: str) -> Optional[str]:
-    """从玩家问句提取商品词：子串匹配，多商品词命中按长度降序优先。"""
+    """从玩家问句提取商品词：子串匹配，多商品词命中按长度降序优先。
+
+    品类后缀边界收紧（审查第十次指令 3②）：商品词命中处紧邻的后一
+    字符 ∈ _GOODS_SUFFIX_CHARS（鞘/柄/套/盒/架/扣/绳/垫/钩）时，该
+    命中视为复合品——「铁剑鞘」不是「铁剑」，跳过该商品词继续循环
+    （更短商品词仍可命中）；全部跳过则返回 None（如「铁剑鞘多少钱」
+    回通用句，不得答铁剑价）。
+    """
     for goods in sorted(_PRICE_LINES, key=len, reverse=True):
-        if goods in text:
-            return goods
+        idx = text.find(goods)
+        if idx < 0:
+            continue
+        nxt = idx + len(goods)
+        if nxt < len(text) and text[nxt] in _GOODS_SUFFIX_CHARS:
+            continue  # 复合品：铁剑鞘 ≠ 铁剑
+        return goods
     return None
 
 

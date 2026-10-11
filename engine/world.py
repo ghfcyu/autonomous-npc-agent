@@ -51,11 +51,18 @@ class WorldEvent:
 
 @dataclass
 class Location:
+    """地图地点。
+
+    category 四类：shop 店铺 / public 公共空间 / residence 居所 /
+    work 作业场所（T4-a 新类别：农田/河畔/牧场/磨坊/木匠铺等
+    生产作业点，供 15 新住民工作地映射）。
+    """
+
     id: str
     name: str
     x: int = 0
     y: int = 0
-    category: str = "public"  # shop / public / residence
+    category: str = "public"  # shop / public / residence / work
 
 
 @dataclass
@@ -142,6 +149,38 @@ class World:
         {"actor": "old_zhang", "summary": "老张坐在铺子门口，回忆着年轻时打铁的日子"},
         {"actor": "guard_wang", "summary": "王守卫在村口来回踱步，查看有没有生面孔"},
         {"actor": "guard_wang", "summary": "王守卫靠着墙打了个盹，又立刻警醒过来"},
+        # --- T4-a：15 新住民自发事件（每人 2 条职业生活文案，追加在
+        #     列表尾部——轮播取模首项不变；按 VILLAGE_ROSTER 新增顺序） ---
+        {"actor": "farmer_wang", "summary": "王氏挎着菜篮从田埂上直起腰，擦了把汗"},
+        {"actor": "farmer_wang", "summary": "王氏把鸡食撒得满地都是，咕咕地唤鸡"},
+        {"actor": "zhao_daniu", "summary": "赵大牛扛着锄头往田里去，边走边哼小调"},
+        {"actor": "zhao_daniu", "summary": "赵大牛抹了把汗，接着侍弄庄稼"},
+        {"actor": "cao_widow", "summary": "曹寡妇低头搓着草绳，手上的活不停"},
+        {"actor": "cao_widow", "summary": "曹寡妇把院里的柴火码得整整齐齐"},
+        {"actor": "farmhand_sun", "summary": "孙小满喂完牲口，才蹲在檐下歇口气"},
+        {"actor": "farmhand_sun", "summary": "孙小满拍了拍裤腿上的泥，又扛起草料"},
+        {"actor": "herder_ma", "summary": "马二叔在牧场数羊，一只不少"},
+        {"actor": "herder_ma", "summary": "马二叔甩了个响鞭，吆喝羊群往水草肥处去"},
+        {"actor": "miller_qian", "summary": "钱多福盯着水车转，盘算磨多少麦子"},
+        {"actor": "miller_qian", "summary": "钱多福拍着磨盘筛面，白雾似的面粉落下来"},
+        {"actor": "carpenter_lu", "summary": "鲁一刀眯眼吊线，一斧子落得又稳又准"},
+        {"actor": "carpenter_lu", "summary": "鲁一刀刨出卷卷木花，堆了满地"},
+        {"actor": "cobbler_jia", "summary": "贾三针捏着锥子纳鞋底，针脚又密又匀"},
+        {"actor": "cobbler_jia", "summary": "贾三针咬断线头，把修好的鞋摆整齐"},
+        {"actor": "peddler_luo", "summary": "罗四方摇着拨浪鼓走街串巷"},
+        {"actor": "peddler_luo", "summary": "罗四方放下担子换了个肩，又吆喝起来"},
+        {"actor": "herb_boy", "summary": "小蓟把晾好的药材分门别类收进药柜"},
+        {"actor": "herb_boy", "summary": "小蓟背着药篓跟在秦大夫身后，一路小跑"},
+        {"actor": "tavern_aman", "summary": "阿满摞着碗筷，把桌椅擦得发亮"},
+        {"actor": "tavern_aman", "summary": "阿满往灶膛里添了把柴，烧上明早的热水"},
+        {"actor": "master_wen", "summary": "文先生在私塾批改学童的描红"},
+        {"actor": "master_wen", "summary": "文先生执卷踱步，领着学童念书"},
+        {"actor": "boy_shitou", "summary": "小石头蘸了墨，一笔一画地描红"},
+        {"actor": "boy_shitou", "summary": "小石头摇头晃脑地背着课文"},
+        {"actor": "watchman_diao", "summary": "刁更头提着灯笼巡到村东头"},
+        {"actor": "watchman_diao", "summary": "刁更头敲着梆子，梆声在夜里传得老远"},
+        {"actor": "widow_yi", "summary": "易婆婆坐在祠堂门槛上晒暖，佛珠慢慢捻"},
+        {"actor": "widow_yi", "summary": "易婆婆眯着眼认了认路过的身影"},
     ]
 
     def __init__(self, locations: Optional[List[Location]] = None,
@@ -207,6 +246,29 @@ class World:
             Location("house_zhou", "周家", 140, 340, "residence"),
             Location("house_yang", "杨家", 380, 300, "residence"),
             Location("house_zhao", "赵家", 250, 340, "residence"),
+            # T4-a 扩容 16 条（与 configs/locations.json 逐条一致——
+            # 双源一致性：id/name/x/y/category 全同）
+            # 西农田牧场带（x<150）
+            Location("pasture", "牧场", 50, 60, "work"),
+            Location("farm", "农田", 90, 120, "work"),
+            Location("river", "河畔", 30, 200, "work"),
+            # 东作坊带（x>350）
+            Location("mill", "磨坊", 370, 120, "work"),
+            Location("carpentry", "木匠铺", 380, 180, "work"),
+            # 公共空间（school/shrine；祠堂在中部 plaza/well 附近）
+            Location("school", "私塾", 280, 250, "public"),
+            Location("shrine", "祠堂", 180, 240, "public"),
+            # 村南居所环带（y 350-420；马家近牧场侧/钱家近磨坊/鲁家贾家
+            # 近木匠铺/易家近祠堂/学塾宅近私塾）
+            Location("house_cao", "曹家", 110, 360, "residence"),
+            Location("house_herder", "马家", 60, 380, "residence"),
+            Location("house_miller", "钱家", 370, 360, "residence"),
+            Location("house_carpenter", "鲁家", 350, 400, "residence"),
+            Location("house_cobbler", "贾家", 390, 380, "residence"),
+            Location("house_peddler", "罗家", 230, 360, "residence"),
+            Location("house_watchman", "刁家", 320, 410, "residence"),
+            Location("house_yi", "易家", 170, 400, "residence"),
+            Location("house_school", "学塾宅", 280, 390, "residence"),
         ]
 
     # ------------------------------------------------------------------ #

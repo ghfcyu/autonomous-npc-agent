@@ -2,11 +2,11 @@
   "id": "farmer_zhao",
   "name": "赵老汉",
   "role": "farmer",
-  "location_id": "plaza",
-  "summary": "在村边种了一辈子地，爱在广场歇脚",
+  "location_id": "farm",
+  "summary": "在村边种了一辈子地，农闲爱蹲田埂歇脚",
   "reactions": {
     "env_event": [
-      "{npc_name}在广场石阶上晒着太阳，{summary}",
+      "{npc_name}在田埂上眯眼看了看天色，{summary}",
       "{npc_name}磕了磕烟袋接着听"
     ],
     "entity_moved": [

@@ -27,9 +27,18 @@
       8 参数浮点文本方法、改消费 to_discrete_tags 离散标签），
       非单点裁剪，实测仍在审查硬标准 4400-4800 内。
 
+口径变更史（T4-a 25 NPC 接入运转，2026-10-11）：
+    - 4501 → 4523：村庄 10→25 NPC（+15 新住民接入运转）后运转噪声
+      溢出——lily@market 同地新增货郎罗四方等的规则反应回流记忆
+      改变 recent 上下文（+22）。提案 A542 风险 4 预见项（“运转噪声
+      仅影响 recent(4)”），反内卷裁定 16 允许：功能变更使旧断言失效
+      时可更新 PINNED；两项 token 裁剪（nearby≤5+关系 top-3）为
+      密度护栏（基线场景 chen nearby 本为空、仅 2 条关系，无削减
+      空间），实测仍在审查硬标准 4400-4800 内。
+
 对抗性设计（先红后绿）：
     红：seed 未固定 → 两次完整场景 total_tokens 概率性不等；
-    绿：seed=42 → 两次 total_tokens 严格相等且恒为 4501 → 通过。
+    绿：seed=42 → 两次 total_tokens 严格相等且恒为 4523 → 通过。
 
 测试路径与命令行复跑完全一致：直接调用 scripts/token_baseline.py 的
 main()（24 tick + 4 对话的完整场景），不做任何桩替换，保证测的就是
@@ -52,7 +61,7 @@ _BASELINE_SCRIPT_PATH = os.path.join(_PROJECT_ROOT, "scripts",
 # 详见文件头口径变更史 2026-10-10 段）。
 # 若未来迭代合法改变 token 基线，须有意识更新此值并同步 README/PROGRESS，
 # 不允许数字未经代码验证进入文档（2026-10-04 审查批评项）。
-PINNED_TOTAL_TOKENS = 4501
+PINNED_TOTAL_TOKENS = 4523
 # 审查硬标准区间
 HARD_RANGE = (4400, 4800)
 

@@ -76,7 +76,10 @@ def innate_secret_tags(ledger):
 
 
 def legacy_location_ids():
-    """既有地点 id 集合（从 configs/locations.json 动态对账，不硬编码 17 清单）。"""
+    """已注册地点 id 集合（从 configs/locations.json 动态对账，不硬编码清单）。
+
+    T4-a 地点扩容后该文件为 33 地点（既有 17 ∪ NEW_LOCATION_IDS 14 ∪
+    farm/river）；函数名沿用历史口径，返回值为 JSON 全量注册地点。"""
     with open(DEFAULT_LOCATIONS_PATH, encoding="utf-8") as fh:
         return {item["id"] for item in json.load(fh)}
 
@@ -94,16 +97,16 @@ def legacy_background_ids():
 
 
 def make_full_village_engine():
-    """构造 T4 场景引擎：核心 2（chen/lily）+ 15 新背景 NPC + 31 地点。
+    """构造 T4 场景引擎：核心 2（chen/lily）+ 15 新背景 NPC + 33 地点。
 
     - npc_configs 显式传 Persona.load_all()：chen/lily 两核心（tag_profile
       声明走引擎常驻账本，与 test_tag_residency 惯例一致）；
     - background_configs 显式传 load_newcomer_configs()：仅加载 15 份
-      新住民配置（engine.py:66-75 显式传入按传入值，生产目录 8 旧背景
+      新住民配置（engine.py 显式传入按传入值，生产目录 8 旧背景
       不加载）——引擎内 2+15=17 NPC 实体，这是任务书预期口径；
-    - World() 构造时自动从 locations.json 载入既有 17 地点；NEW_LOCATION_IDS
-      14 个新地点手动补注册（house_* 归 residence，其余归 public），
-      保证新背景 NPC 的居所/工作地全部在场（tick 作息驱动可移动）。
+    - T4-a 地点扩容后 locations.json 已含全部 33 地点（既有 17 ∪ NEW
+      14 ∪ farm/river），World() 构造即全量载入；下方 NEW_LOCATION_IDS
+      14 个的手工注入变为同键覆盖（无害），保留以兼容扩容前场景。
     """
     engine = NPCEngine(llm=MockLLMProvider(),
                        npc_configs=Persona.load_all(),
@@ -536,10 +539,11 @@ class TestNewcomerConfigs(unittest.TestCase):
                          expected_newcomers)
 
     def test_residences_and_workplaces_registered(self):
-        # 每份 residence 与 location_id ∈ 既有 17 地点 ∪ NEW_LOCATION_IDS
-        # （既有 17 从 configs/locations.json 动态读取比对，不硬编码）
+        # 每份 residence 与 location_id ∈ 已注册地点集合
+        # （从 configs/locations.json 动态读取比对，不硬编码；T4-a 扩容后
+        # 该文件为 33 地点 = 既有 17 ∪ NEW 14 ∪ farm/river）
         valid = legacy_location_ids() | set(NEW_LOCATION_IDS)
-        self.assertEqual(len(legacy_location_ids()), 17)
+        self.assertEqual(len(legacy_location_ids()), 33)
         for cfg in self.configs:
             self.assertIn(cfg["residence"], valid,
                           msg=f"{cfg['id']} residence 未注册: {cfg['residence']}")
@@ -582,8 +586,9 @@ class TestEnvZeroLLM(unittest.TestCase):
     2+15=17 实体（任务书预期口径，不断言 25）。
     """
 
-    def test_engine_scale_17_npcs_31_locations(self):
-        # 17 实体口径：2 核心 + 15 新背景全在场；31 地点 = 既有 17 ∪ NEW 14
+    def test_engine_scale_17_npcs_33_locations(self):
+        # 17 实体口径：2 核心 + 15 新背景全在场；33 地点 = 既有 17 ∪
+        # NEW 14 ∪ farm/river（T4-a 地点扩容后 locations.json 全量注册）
         engine = make_full_village_engine()
         self.assertEqual(len(engine.npcs), 2)
         self.assertEqual(set(engine.npcs), {"chen", "lily"})
@@ -593,8 +598,8 @@ class TestEnvZeroLLM(unittest.TestCase):
         for npc_id in newcomer_ids | {"chen", "lily"}:
             self.assertIn(npc_id, engine.world.entities, msg=npc_id)
         legacy = legacy_location_ids()
-        self.assertEqual(len(legacy), 17)
-        self.assertEqual(len(engine.world.locations), 17 + len(NEW_LOCATION_IDS))
+        self.assertEqual(len(legacy), 33)
+        self.assertEqual(len(engine.world.locations), 33)
         for loc_id in legacy | set(NEW_LOCATION_IDS):
             self.assertIn(loc_id, engine.world.locations, msg=loc_id)
 

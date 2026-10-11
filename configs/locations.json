@@ -15,5 +15,21 @@
   {"id": "house_qin", "name": "秦家", "x": 320, "y": 330, "category": "residence"},
   {"id": "house_zhou", "name": "周家", "x": 140, "y": 340, "category": "residence"},
   {"id": "house_yang", "name": "杨家", "x": 380, "y": 300, "category": "residence"},
-  {"id": "house_zhao", "name": "赵家", "x": 250, "y": 340, "category": "residence"}
+  {"id": "house_zhao", "name": "赵家", "x": 250, "y": 340, "category": "residence"},
+  {"id": "pasture", "name": "牧场", "x": 50, "y": 60, "category": "work"},
+  {"id": "farm", "name": "农田", "x": 90, "y": 120, "category": "work"},
+  {"id": "river", "name": "河畔", "x": 30, "y": 200, "category": "work"},
+  {"id": "mill", "name": "磨坊", "x": 370, "y": 120, "category": "work"},
+  {"id": "carpentry", "name": "木匠铺", "x": 380, "y": 180, "category": "work"},
+  {"id": "school", "name": "私塾", "x": 280, "y": 250, "category": "public"},
+  {"id": "shrine", "name": "祠堂", "x": 180, "y": 240, "category": "public"},
+  {"id": "house_cao", "name": "曹家", "x": 110, "y": 360, "category": "residence"},
+  {"id": "house_herder", "name": "马家", "x": 60, "y": 380, "category": "residence"},
+  {"id": "house_miller", "name": "钱家", "x": 370, "y": 360, "category": "residence"},
+  {"id": "house_carpenter", "name": "鲁家", "x": 350, "y": 400, "category": "residence"},
+  {"id": "house_cobbler", "name": "贾家", "x": 390, "y": 380, "category": "residence"},
+  {"id": "house_peddler", "name": "罗家", "x": 230, "y": 360, "category": "residence"},
+  {"id": "house_watchman", "name": "刁家", "x": 320, "y": 410, "category": "residence"},
+  {"id": "house_yi", "name": "易家", "x": 170, "y": 400, "category": "residence"},
+  {"id": "house_school", "name": "学塾宅", "x": 280, "y": 390, "category": "residence"}
 ]

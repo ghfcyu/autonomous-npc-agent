@@ -89,8 +89,9 @@ RelationshipNetwork（存储 List[Relationship]）
 ```
 
 - **Relationship**：有向社会关系（source → target），含关系类型（父亲/熟人/宿敌）与好感值（-1.0~1.0）
-- **RelationshipNetwork**：存储与查询关系，`to_prompt_text()` 生成注入 LLM 决策上下文的关系描述（好感 >0.3 显示"好感"，< -0.3 显示"敌意"），无关系时返回空串不注入
+- **RelationshipNetwork**：存储与查询关系，`to_prompt_text()` 生成注入 LLM 决策上下文的关系描述（好感 >0.3 显示"好感"，< -0.3 显示"敌意"，按 |affinity| 稳定排序保底桶优先取 top-3），无关系时返回空串不注入
 - **配置驱动**：`configs/relationships.json`（JSON 数组），NPCEngine 初始化时自动加载
+- **T4-b 村庄社会图（2026-10-12）**：配置扩容至 44 条覆盖 25 NPC 全员出边——四层结构（血缘赵家四口+陈氏父子/师徒两组/邻里/职业往来），枢纽长尾（酒馆老板/大夫/守卫各 3 出边 > 全村出边中位数），孤寡/学童/学徒恰 1 条，敌意对（磨坊主↔渔夫冤家，affinity<0，T6 把柄玩法埋点）；top-3 截断护栏随密度补齐首次真实激活（chen 运行时 4 出边截断、敌意边凭 |affinity| 竞争进 top-3），密度带/结构断言见 `tests/test_village_social_graph.py`
 
 ### 2.8 背景 NPC 层（`engine/background_npc.py`）
 

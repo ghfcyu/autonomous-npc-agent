@@ -27,12 +27,17 @@
   TestBlueprintSelfCheck 用 from_list 在内存构造 44 条蓝图数据自证
   断言逻辑正确（不依赖生产文件落地时序），生产直载/真引擎类验收
   数据落地状态，红绿归因清晰；
-- 蓝图中 33 条边有契约值；其余 11 条长尾边（PM 授权分布自由度）按
-  契约不变量自行设计，与实现子代理的具体取值不同——测试锁的是契约
-  不变量，不是实现的逐字镜像。
+- 【第十二次审查 CONDITIONAL 清偿】夹具原享有 11 条长尾边分布自由
+  度，与生产 configs/relationships.json 实测存在 13+ 处边漂移（方向
+  反转 1 处 / 关系词 2 处 / affinity 10 处）；现按「生产数据是唯一
+  真源（蓝图即契约）」将 BLUEPRINT_EDGES 逐字对齐生产文件（44 条
+  按生产顺序排列、五字段逐字相同），并新增 TestBlueprintProductionSync
+  把「夹具 = 生产」固化为对账断言——生产未来变更而夹具未同步时必红。
 """
 
+import json
 import unittest
+from pathlib import Path
 from statistics import median
 
 from engine.engine import DEFAULT_RELATIONSHIPS_PATH, NPCEngine
@@ -77,7 +82,8 @@ PRIORITY_TWELVE = (
 
 
 # ========================================================================== #
-# 蓝图 44 条内存数据（33 条契约值边 + 11 条长尾自由边）
+# 蓝图 44 条内存数据（第十二次审查清偿：与 configs/relationships.json
+# 逐字镜像——生产数据是唯一真源，蓝图即契约；44 条边按生产文件顺序排列）
 # ========================================================================== #
 BLUEPRINT_EDGES = [
     # ---- chen：恰 3 条出边（父亲/酒友/老主顾）—— top-3 截断场景 ----
@@ -94,11 +100,16 @@ BLUEPRINT_EDGES = [
      "relation": "供货商", "affinity": 0.4},
     {"source_id": "lily", "target_id": "peddler_luo", "target_name": "罗四方",
      "relation": "同行", "affinity": 0.35},
-    # ---- 赵家血缘保底 6 条 ----
+    # ---- farmer_zhao：3 条出边（妻子/儿子血缘保底 + 主顾 miller_qian）----
+    #   （按生产 relationships.json 口径修正：补回 miller_qian 主顾 0.5 边，
+    #     蓝图原缺，farmer_zhao 度数 2→3）
     {"source_id": "farmer_zhao", "target_id": "farmer_wang",
      "target_name": "王氏", "relation": "妻子", "affinity": 0.9},
     {"source_id": "farmer_zhao", "target_id": "zhao_daniu",
      "target_name": "赵大牛", "relation": "儿子", "affinity": 0.85},
+    {"source_id": "farmer_zhao", "target_id": "miller_qian",
+     "target_name": "钱多福", "relation": "主顾", "affinity": 0.5},
+    # ---- farmer_wang / zhao_daniu：赵家血缘其余 4 条保底 ----
     {"source_id": "farmer_wang", "target_id": "farmer_zhao",
      "target_name": "赵老汉", "relation": "丈夫", "affinity": 0.9},
     {"source_id": "farmer_wang", "target_id": "zhao_daniu",
@@ -107,37 +118,75 @@ BLUEPRINT_EDGES = [
      "target_name": "赵老汉", "relation": "父亲", "affinity": 0.85},
     {"source_id": "zhao_daniu", "target_id": "farmer_wang",
      "target_name": "王氏", "relation": "母亲", "affinity": 0.85},
-    # ---- 师徒保底 4 条（两对） ----
+    # ---- farmhand_sun：恰 1 条出边（长工投东家）----
+    #   （按生产 relationships.json 口径修正：东家 affinity 0.7→0.6；
+    #     删除蓝图自设计的 herder_ma 工友边——度数 2→1）
+    {"source_id": "farmhand_sun", "target_id": "farmer_zhao",
+     "target_name": "赵老汉", "relation": "东家", "affinity": 0.6},
+    # ---- 孤寡/学童/学徒组：各恰 1 条出边 ----
+    #   （widow_yi 按生产 relationships.json 口径修正：邻居 0.6→恩人 0.8；
+    #     cao_widow 按生产口径修正：weaver_yang 邻居 0.5→doc_qin 恩人 0.7；
+    #     tavern_aman 按生产口径修正：东家 affinity 0.8→0.7）
+    {"source_id": "widow_yi", "target_id": "baker_liu",
+     "target_name": "刘婶", "relation": "恩人", "affinity": 0.8},
+    {"source_id": "cao_widow", "target_id": "doc_qin",
+     "target_name": "秦大夫", "relation": "恩人", "affinity": 0.7},
     {"source_id": "boy_shitou", "target_id": "master_wen",
      "target_name": "文先生", "relation": "师父", "affinity": 0.75},
-    {"source_id": "master_wen", "target_id": "boy_shitou",
-     "target_name": "小石头", "relation": "徒弟", "affinity": 0.7},
     {"source_id": "herb_boy", "target_id": "doc_qin",
      "target_name": "秦大夫", "relation": "师父", "affinity": 0.85},
+    {"source_id": "tavern_aman", "target_id": "tavern_sun",
+     "target_name": "孙老三", "relation": "东家", "affinity": 0.7},
+    # ---- cobbler_jia：恰 1 条出边（邻居 carpenter_lu）----
+    #   （按生产 relationships.json 口径修正：蓝图自设计的 chen 老主顾
+    #     0.7 + peddler_luo 供货商 0.4 两条边收敛为 1 条邻居边——度数 2→1）
+    {"source_id": "cobbler_jia", "target_id": "carpenter_lu",
+     "target_name": "鲁一刀", "relation": "邻居", "affinity": 0.4},
+    # ---- 枢纽 doc_qin：恰 3 条出边（徒弟/老友/病人）----
+    #   （病人边按生产 relationships.json 口径修正：目标 weaver_yang→cao_widow）
     {"source_id": "doc_qin", "target_id": "herb_boy",
      "target_name": "小蓟", "relation": "徒弟", "affinity": 0.8},
-    # ---- 陈家父子保底 2 条 ----
-    {"source_id": "old_zhang", "target_id": "chen",
-     "target_name": "铁匠陈", "relation": "儿子", "affinity": 0.9},
-    # ---- 枢纽 tavern_sun：恰 3 条 ----
+    {"source_id": "doc_qin", "target_id": "old_zhang",
+     "target_name": "老张", "relation": "老友", "affinity": 0.7},
+    {"source_id": "doc_qin", "target_id": "cao_widow",
+     "target_name": "曹寡妇", "relation": "病人", "affinity": 0.5},
+    # ---- master_wen：师徒反向保底 1 条 ----
+    {"source_id": "master_wen", "target_id": "boy_shitou",
+     "target_name": "小石头", "relation": "徒弟", "affinity": 0.7},
+    # ---- miller_qian：2 条出边（主顾 + 冤家敌意边）—— 敌意对正向半边 ----
+    #   （按生产 relationships.json 口径修正：补回 farmer_zhao 主顾 0.5
+    #     边，蓝图原仅 1 条冤家边——度数 1→2）
+    {"source_id": "miller_qian", "target_id": "farmer_zhao",
+     "target_name": "赵老汉", "relation": "主顾", "affinity": 0.5},
+    {"source_id": "miller_qian", "target_id": "fisher_zhou",
+     "target_name": "周渔夫", "relation": "冤家", "affinity": -0.6},
+    # ---- carpenter_lu / peddler_luo / weaver_yang：各恰 1 条出边 ----
+    #   （carpenter_lu 按生产 relationships.json 口径修正：cobbler_jia
+    #     同行 0.6→farmer_zhao 主顾 0.5；peddler_luo 同行 0.5→0.4；
+    #     weaver_yang 关系词 老主顾→主顾、affinity 0.6→0.5）
+    {"source_id": "carpenter_lu", "target_id": "farmer_zhao",
+     "target_name": "赵老汉", "relation": "主顾", "affinity": 0.5},
+    {"source_id": "peddler_luo", "target_id": "lily",
+     "target_name": "商人莉莉", "relation": "同行", "affinity": 0.4},
+    {"source_id": "weaver_yang", "target_id": "lily",
+     "target_name": "商人莉莉", "relation": "主顾", "affinity": 0.5},
+    # ---- 枢纽 tavern_sun：恰 3 条出边 ----
     {"source_id": "tavern_sun", "target_id": "fisher_zhou",
      "target_name": "周渔夫", "relation": "供货商", "affinity": 0.6},
     {"source_id": "tavern_sun", "target_id": "guard_wang",
      "target_name": "王守卫", "relation": "酒友", "affinity": 0.5},
     {"source_id": "tavern_sun", "target_id": "doc_qin",
      "target_name": "秦大夫", "relation": "老主顾", "affinity": 0.7},
-    # ---- 枢纽 doc_qin：恰 3 条（徒弟 0.8 已列师徒组） ----
-    {"source_id": "doc_qin", "target_id": "old_zhang",
-     "target_name": "老张", "relation": "老友", "affinity": 0.7},
-    {"source_id": "doc_qin", "target_id": "weaver_yang",
-     "target_name": "杨大姐", "relation": "病人", "affinity": 0.5},
-    # ---- 枢纽 guard_wang：恰 3 条 ----
+    # ---- 枢纽 guard_wang：恰 3 条出边 ----
     {"source_id": "guard_wang", "target_id": "doc_qin",
      "target_name": "秦大夫", "relation": "恩人", "affinity": 0.8},
     {"source_id": "guard_wang", "target_id": "watchman_diao",
      "target_name": "刁更头", "relation": "同僚", "affinity": 0.5},
     {"source_id": "guard_wang", "target_id": "fisher_zhou",
      "target_name": "周渔夫", "relation": "酒友", "affinity": 0.3},
+    # ---- watchman_diao：恰 1 条出边 ----
+    {"source_id": "watchman_diao", "target_id": "guard_wang",
+     "target_name": "王守卫", "relation": "同僚", "affinity": 0.5},
     # ---- fisher_zhou：4 条出边（含敌意边）—— 敌意 top-3 对抗场景 ----
     {"source_id": "fisher_zhou", "target_id": "tavern_sun",
      "target_name": "孙老三", "relation": "老主顾", "affinity": 0.6},
@@ -147,39 +196,23 @@ BLUEPRINT_EDGES = [
      "target_name": "刘婶", "relation": "主顾", "affinity": 0.4},
     {"source_id": "fisher_zhou", "target_id": "guard_wang",
      "target_name": "王守卫", "relation": "酒友", "affinity": 0.3},
-    # ---- 敌意对另半边：miller_qian 恰 1 条 ----
-    {"source_id": "miller_qian", "target_id": "fisher_zhou",
-     "target_name": "周渔夫", "relation": "冤家", "affinity": -0.6},
-    # ---- 孤寡/学童/学徒：恰 1 条出边 ----
-    {"source_id": "widow_yi", "target_id": "baker_liu",
-     "target_name": "刘婶", "relation": "邻居", "affinity": 0.6},
-    {"source_id": "cao_widow", "target_id": "weaver_yang",
-     "target_name": "杨大姐", "relation": "邻居", "affinity": 0.5},
-    {"source_id": "tavern_aman", "target_id": "tavern_sun",
-     "target_name": "孙老三", "relation": "东家", "affinity": 0.8},
-    # ---- 长尾其余 8 人：11 条自由分布（契约仅约束全员非空 + 中位数≤2） ----
-    {"source_id": "farmhand_sun", "target_id": "farmer_zhao",
-     "target_name": "赵老汉", "relation": "东家", "affinity": 0.7},
-    {"source_id": "farmhand_sun", "target_id": "herder_ma",
-     "target_name": "马二叔", "relation": "工友", "affinity": 0.5},
-    {"source_id": "cobbler_jia", "target_id": "chen",
-     "target_name": "铁匠陈", "relation": "老主顾", "affinity": 0.7},
-    {"source_id": "cobbler_jia", "target_id": "peddler_luo",
-     "target_name": "罗四方", "relation": "供货商", "affinity": 0.4},
-    {"source_id": "carpenter_lu", "target_id": "cobbler_jia",
-     "target_name": "贾三针", "relation": "同行", "affinity": 0.6},
-    {"source_id": "peddler_luo", "target_id": "lily",
-     "target_name": "商人莉莉", "relation": "同行", "affinity": 0.5},
-    {"source_id": "weaver_yang", "target_id": "lily",
-     "target_name": "商人莉莉", "relation": "老主顾", "affinity": 0.6},
-    {"source_id": "watchman_diao", "target_id": "guard_wang",
-     "target_name": "王守卫", "relation": "同僚", "affinity": 0.5},
-    {"source_id": "herder_ma", "target_id": "farmer_wang",
-     "target_name": "王氏", "relation": "邻居", "affinity": 0.4},
+    # ---- herder_ma：恰 1 条出边 ----
+    #   （按生产 relationships.json 口径修正：farmer_wang 邻居 0.4→
+    #     tavern_sun 主顾 0.4——目标换人）
+    {"source_id": "herder_ma", "target_id": "tavern_sun",
+     "target_name": "孙老三", "relation": "主顾", "affinity": 0.4},
+    # ---- old_zhang：陈家父子反向保底 1 条 ----
+    {"source_id": "old_zhang", "target_id": "chen",
+     "target_name": "铁匠陈", "relation": "儿子", "affinity": 0.9},
+    # ---- baker_liu：2 条出边（farmer_zhao 邻居 + miller_qian 供货商）----
+    #   （方向反转修正：蓝图 baker_liu→chen 老主顾 0.4 在生产不存在——
+    #     生产 chen→baker_liu 才是老主顾方向（已列 chen 组）；按生产
+    #     relationships.json 口径修正，baker_liu 第二条出边为 miller_qian
+    #     供货商 0.5）
     {"source_id": "baker_liu", "target_id": "farmer_zhao",
      "target_name": "赵老汉", "relation": "邻居", "affinity": 0.6},
-    {"source_id": "baker_liu", "target_id": "chen",
-     "target_name": "铁匠陈", "relation": "老主顾", "affinity": 0.4},
+    {"source_id": "baker_liu", "target_id": "miller_qian",
+     "target_name": "钱多福", "relation": "供货商", "affinity": 0.5},
 ]
 
 
@@ -541,6 +574,65 @@ class TestPriorityGuaranteeCrossCheck(unittest.TestCase):
 
     def test_chen_father_edge_affinity_is_0_9(self):
         assert_chen_father_affinity_0_9(self, self.net)
+
+
+# ========================================================================== #
+# 6. TestBlueprintProductionSync —— 夹具与生产逐字对账（第十二次审查清偿）
+# ========================================================================== #
+PRODUCTION_RELATIONSHIPS_PATH = (
+    Path(__file__).resolve().parent.parent / "configs" / "relationships.json")
+# 边对账字段序（逐字段比较，任何字段漂移都进入集合差集）
+EDGE_FIELDS = ("source_id", "target_id", "target_name", "relation", "affinity")
+
+
+class TestBlueprintProductionSync(unittest.TestCase):
+    """夹具与生产零漂移守卫：BLUEPRINT_EDGES == configs/relationships.json。
+
+    第十二次审查（CONDITIONAL）清偿条件：BLUEPRINT_EDGES 曾与生产
+    configs/relationships.json 存在 13+ 处边漂移（方向反转 1 处 /
+    关系词 2 处 / affinity 10 处），漂移夹具放行进仓库=测试资产与
+    生产数据的隐性分叉。生产数据是唯一真源，夹具已逐字对齐；本类
+    把对账固化为断言——生产文件未来任何变更而夹具未同步时，本测试
+    必红，漂移不再依赖人工对账发现。
+
+    对账口径：每条边按 EDGE_FIELDS 五字段转元组做集合比较；两个
+    用例分别守卫条数与集合内容——缺边/多边/重边红 ①，任何一条边
+    任何字段改值红 ②，两用例合起来无漂移形态能漏网。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        with open(PRODUCTION_RELATIONSHIPS_PATH, encoding="utf-8") as f:
+            cls.production_edges = json.load(f)
+
+    def test_edge_count_matches_production(self):
+        """对账 ①：夹具条数 == 生产条数（缺边/多边/重边先在此报警）。"""
+        self.assertEqual(
+            len(BLUEPRINT_EDGES), len(self.production_edges),
+            msg=(f"夹具 {len(BLUEPRINT_EDGES)} 条 ≠ 生产 "
+                 f"{len(self.production_edges)} 条——生产文件变更后 "
+                 f"BLUEPRINT_EDGES 未同步"))
+
+    def test_every_edge_field_matches_production(self):
+        """对账 ②：两集合逐字段一致，任何一条边任何字段漂移必红。"""
+        production_keys = [tuple(e[f] for f in EDGE_FIELDS)
+                           for e in self.production_edges]
+        fixture_keys = [tuple(e[f] for f in EDGE_FIELDS)
+                        for e in BLUEPRINT_EDGES]
+        # 漂移边定位（按各自文件顺序取第一条）：仅生产有=夹具漏改，
+        # 仅夹具有=夹具残留旧值——msg 直接给出漂移边全文，便于排查
+        production_only = [k for k in production_keys
+                           if k not in set(fixture_keys)]
+        fixture_only = [k for k in fixture_keys
+                        if k not in set(production_keys)]
+        self.assertEqual(
+            set(fixture_keys), set(production_keys),
+            msg=(f"夹具与生产存在漂移边（字段序 {EDGE_FIELDS}）："
+                 f"第一条仅生产有 "
+                 f"{production_only[0] if production_only else '无'}；"
+                 f"第一条仅夹具有 "
+                 f"{fixture_only[0] if fixture_only else '无'}"
+                 f"——按生产 configs/relationships.json 口径同步夹具"))
 
 
 if __name__ == "__main__":

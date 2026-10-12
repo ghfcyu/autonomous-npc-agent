@@ -172,6 +172,10 @@ class TestBackgroundNPCReactions(unittest.TestCase):
                            "{npc_name} 竖起了耳朵：{summary}"]}), world)
         for _ in range(4):
             self.assertTrue(world.accumulate_event_slot(1.0))
+            # 反应同 hour 判重（第十二次审查落地）：同 hour 内同类事件只
+            # 反应一次，故逐小时错开触发（8→9→10→11 点），轮转全序列仍
+            # 四连可见；下方全部断言保持原样
+            world.game_minute += 60
         actions = npc_actions(world.bus, "gossip")
         self.assertEqual(len(actions), 4)
         texts = [e.payload["summary"] for e in actions]

@@ -45,6 +45,10 @@ class BackgroundNPC:
       每小时演化（无表项小时沿用当前作息状态）——纯 Tier 0/1 规则计算，零 LLM 零 prompt（封印语义：
       EnvMind 数值与英文字段名不进任何 LLM prompt，行为出口仅为
       npc_action 文案变体）
+    - 反应同 hour 判重（第十二次审查落地）：判重键 (hour, event.kind)——
+      同一小时内对同一事件类型至多发布一条 npc_action（位置过滤通过
+      才计配额，跨 hour 自动恢复），hour 口径与 EnvMind 演化层
+      _last_evolved_hour 一致（self._world.hour）
     """
     def __init__(self, config: Dict[str, Any], world: World,
                  env_mind: Optional[EnvMind] = None) -> None:
@@ -57,6 +61,10 @@ class BackgroundNPC:
         self._schedule: Dict[str, str] = config.get("schedule", {})
         self._world = world
         self._reaction_counter: Dict[str, int] = {}
+        # 反应同 hour 判重（第十二次审查）：kind → 最近一次实际发布过
+        # 反应的 hour。与演化层 _last_evolved_hour 同 hour 口径，防同
+        # hour 内对同类事件复读式连发（farmer_zhao tick11 三连复读）。
+        self._last_react_hour: Dict[str, int] = {}
         self._workplace = config["location_id"]   # 工作地（初始位置），存储后不变
         self._current_state: Optional[str] = None  # 当前作息状态，初始无
         # T4-b 第二小步：4D 压缩稳态（None 时不演化、变体恒为空串，行为
@@ -161,6 +169,15 @@ class BackgroundNPC:
             # 移动事件：只反应有人移动到自己的地点
             if event.payload.get("to") != self._entity.location_id:
                 return
+        # 同 hour 判重（第十二次审查）：本 hour 内该事件类型已发布过反应
+        # 则直接跳过——放在位置过滤之后，别处事件不消耗配额；hour 取值
+        # 与演化层同口径（engine.tick 经 apply_schedule(self._world.hour)
+        # 传入，此处同取 self._world.hour）；跨 hour 不等即判新，自动恢复
+        # 反应资格；通过判重后无提前返回，记录的 hour 必对应实际发布。
+        hour = self._world.hour
+        if self._last_react_hour.get(event.kind) == hour:
+            return
+        self._last_react_hour[event.kind] = hour
         # 确定性选择模板（计数器取模轮转）
         counter = self._reaction_counter.get(event.kind, 0)
         template = templates[counter % len(templates)]

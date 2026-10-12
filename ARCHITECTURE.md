@@ -116,7 +116,7 @@ EnvMind 4D 行为消费数据流（T4-b 第二小步，2026-10-12）：
 
 - **BackgroundNPC**：轻量级 NPC，不持有 LLM 引用（架构上不可能调用 LLM），不维护记忆/完整内状态（InnerState 8D）/状态机；T4-b 起可选持有 4D 压缩稳态 EnvMind（非 InnerState 8D，env_mind=None 时行为与旧版完全一致）
 - **配置驱动**：`configs/background_npcs/*.json`（id/name/role/location_id/summary/reactions/inventory/residence/schedule），NPCEngine 全默认构造时自动加载；`residence` 为居所地点 id（缺省回退初始位置），`schedule` 为作息表（G6-B 已实现作息驱动：`apply_schedule` 按 tick 时间在工作地与居所间移动 NPC，WORKING→工作地、SLEEPING→居所、IDLE→保持原位）
-- **规则反应**：对配置了模板的事件类型产生确定性反应——`env_event` 只反应同地点、`entity_moved` 只反应有人来到自己地点，模板按计数器取模轮转，`{npc_name}` 替换为 NPC 名
+- **规则反应**：对配置了模板的事件类型产生确定性反应——`env_event` 只反应同地点、`entity_moved` 只反应有人来到自己地点，模板按计数器取模轮转，`{npc_name}` 替换为 NPC 名；**反应同 hour 判重（2026-10-13，第十二次审查落地）**：同一小时内对同一事件类型至多发布一条 npc_action（判重键 `(hour, event.kind)`，位置过滤通过才计配额、跨 hour 自动恢复），与 EnvMind 演化层 `_last_evolved_hour` 同 hour 口径——消灭"farmer_zhao 同小时对同类事件三连复读"的复读机风险，NPC 反应符合"活人不会一小时反复念叨同一件事"的叙事
 - **EnvMind 4D 行为消费（T4-b 第二小步，2026-10-12）**：`ENV_MIND_VARIANTS`（字段名/阈值 0.65/纯中文后缀，生理疲劳>饥饿优先于压力与情绪，至多一条）+ `MIND_EVOLUTION_RATES`（WORKING 劳作累积/IDLE 歇脚恢复/SLEEPING 睡眠归平，同 hour 多 tick 靠 hour 变化判重只演化一步，frozen dataclass 经 `dataclasses.replace` 整体替换、clamp [0,1]）；`to_dict()` 末尾附 `env_mind` 快照键（None 时为 None，status 观测出口）。**封印语义精确化**：Tier 0/1 封印 = 不进任何 LLM prompt、不调任何 LLM——EnvMind 数值与英文字段名（p_fatigue 等）永不进 prompt，行为出口为纯中文文案变体拼接，只出现在 npc_action 事件文本中（核心 NPC 感知的是带变体的文案而非 4D 数值）
 - **零 LLM 断言**：MockLLMProvider 记录 `call_count`/`call_log` 与 `total_tokens_used`，测试可断言背景 NPC 的 id 从未出现在调用日志中、且 `total_tokens_used == 0`（以 token 数非调用次数证明零 LLM）
 

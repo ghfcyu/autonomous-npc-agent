@@ -19,7 +19,7 @@ from .llm.base import BaseLLMProvider
 from .npc import NPC, Persona
 from .relationships import RelationshipNetwork
 from .states import NPCState
-from .village_genesis import load_newcomer_configs
+from .village_genesis import env_mind_for, load_newcomer_configs
 from .world import Entity, World, WorldEvent
 
 DEFAULT_BG_CONFIG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -67,6 +67,8 @@ class NPCEngine:
         # 时不隐式注入，保证场景可控（既有语义零变化）。
         # load_newcomer_configs 复用 village_genesis 单一来源，
         # 不在本模块复制目录扫描逻辑（两套扫描漂移=共线性死穴）。
+        # T4-b 第二小步：三路 bg_configs 统一经 env_mind_for 注入 4D EnvMind
+        # 确定性初值（id 不在花名册 / key NPC → None，行为与旧版完全一致）。
         self.background_npcs: Dict[str, BackgroundNPC] = {}
         if background_configs is not None:
             bg_configs = background_configs
@@ -75,7 +77,7 @@ class NPCEngine:
         else:
             bg_configs = []
         for config in bg_configs:
-            bg = BackgroundNPC(config, self.world)
+            bg = BackgroundNPC(config, self.world, env_mind=env_mind_for(config["id"]))
             self.background_npcs[bg.id] = bg
 
     @staticmethod

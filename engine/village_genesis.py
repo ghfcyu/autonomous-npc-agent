@@ -157,6 +157,25 @@ def generate_village() -> dict[str, VillagerProfile]:
     return {seed.npc_id: generate_villager(seed) for seed in VILLAGE_ROSTER}
 
 
+# npc_id → seed 只读索引（花名册常量索引，供 env_mind_for O(1) 查表）。
+_ROSTER_INDEX: dict = {seed.npc_id: seed for seed in VILLAGE_ROSTER}
+
+
+def env_mind_for(npc_id: str) -> Optional[EnvMind]:
+    """按 npc_id 返回环境 NPC 的确定性 EnvMind 初值（复用 generate_villager
+    单一采样内核，严禁在本函数内复制 rng 采样逻辑——共线性纪律）。
+    key NPC（mind=None）或未知 id 返回 None。
+
+    T4-b 第二小步行为消费出口：引擎构造背景 NPC 时按 config["id"] 注入，
+    初值与 generate_village 同一 crc32 确定性口径（跨进程跨实例一致）。
+    产物为纯数据层，Tier 0/1 封印零 LLM，不进任何 prompt。
+    """
+    seed = _ROSTER_INDEX.get(npc_id)
+    if seed is None:
+        return None
+    return generate_villager(seed).mind
+
+
 def load_newcomer_configs() -> list[dict]:
     """读取 village_roster 目录下全部 .json（sorted 排序，与 engine._load_bg_configs 同风格）。
 

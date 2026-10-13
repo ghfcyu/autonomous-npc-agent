@@ -49,7 +49,8 @@ from engine.relationships import RelationshipNetwork
 # ========================================================================== #
 # 蓝图契约常量
 # ========================================================================== #
-# 25 NPC 全员 id（审查第十一次蓝图名册：2 核心 + 8 旧背景 + 15 新住民）
+# 25 NPC 全员 id（审查第十一次蓝图名册；T4-b 收尾段后分层：3 核心 +
+# 7 旧背景 + 15 新住民，名册成员不变）
 ALL_NPC_IDS = (
     "chen", "lily", "farmer_zhao", "farmer_wang", "zhao_daniu",
     "farmhand_sun", "widow_yi", "cao_widow", "boy_shitou", "herb_boy",

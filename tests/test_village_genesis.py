@@ -9,7 +9,7 @@
 1. 分布断言：6D 截断正态形状（均值带/标准差带/值域锁）+ 财富对数正态
    中位数带 + 齐普夫职业长尾（特殊职业 ≤2、非平顶、理论一致性）+
    金字塔分档占比（大样本 400，固定 seed 确定性，非 flaky）；
-2. 分层：key（chen/lily）与 env（23 人）心智分层——key mind=None 由
+2. 分层：key（chen/lily/tavern_sun）与 env（22 人）心智分层——key mind=None 由
    引擎常驻账本接管，env 走 EnvMind 4D 压缩稳态（字段与 8D 同名，
    共线性纪律：不新增维度）且常人平稳带值域；
 3. 批量挂载复用：generate_village 与引擎 _build_tag_ledger 共用
@@ -85,7 +85,7 @@ def legacy_location_ids():
 
 
 def legacy_background_ids():
-    """旧 8 背景 NPC 的 npc_id 集合（它们已有 configs/background_npcs/ 配置，
+    """旧 7 背景 NPC 的 npc_id 集合（它们已有 configs/background_npcs/ 配置，
     不在 configs/village_roster 新住民目录中）。"""
     ids = set()
     for fname in sorted(os.listdir(DEFAULT_BG_CONFIG_DIR)):
@@ -97,13 +97,14 @@ def legacy_background_ids():
 
 
 def make_full_village_engine():
-    """构造 T4 场景引擎：核心 2（chen/lily）+ 15 新背景 NPC + 33 地点。
+    """构造 T4 场景引擎：核心 3（chen/lily/tavern_sun）+ 15 新背景 NPC
+    + 33 地点。
 
-    - npc_configs 显式传 Persona.load_all()：chen/lily 两核心（tag_profile
-      声明走引擎常驻账本，与 test_tag_residency 惯例一致）；
+    - npc_configs 显式传 Persona.load_all()：chen/lily/tavern_sun 三核心
+      （tag_profile 声明走引擎常驻账本，与 test_tag_residency 惯例一致）；
     - background_configs 显式传 load_newcomer_configs()：仅加载 15 份
-      新住民配置（engine.py 显式传入按传入值，生产目录 8 旧背景
-      不加载）——引擎内 2+15=17 NPC 实体，这是任务书预期口径；
+      新住民配置（engine.py 显式传入按传入值，生产目录 7 旧背景
+      不加载）——引擎内 3+15=18 NPC 实体，这是任务书预期口径；
     - T4-a 地点扩容后 locations.json 已含全部 33 地点（既有 17 ∪ NEW
       14 ∪ farm/river），World() 构造即全量载入；下方 NEW_LOCATION_IDS
       14 个的手工注入变为同键覆盖（无害），保留以兼容扩容前场景。
@@ -122,7 +123,7 @@ def make_full_village_engine():
 # 1. TestRosterStructure —— 花名册结构锁（验收条款：分布断言之结构层）
 # ========================================================================== #
 class TestRosterStructure(unittest.TestCase):
-    """25 NPC 花名册结构锁：sector 表全等、id 无重复、key/env 2+23、
+    """25 NPC 花名册结构锁：sector 表全等、id 无重复、key/env 3+22、
     农夫恰 5 人、sector 计数呈长尾（最大阶层 ≥ 中位数 ×2）。"""
 
     EXPECTED_SECTORS = {"farming": 7, "hunt": 1, "craft": 5, "trade": 2,
@@ -146,12 +147,12 @@ class TestRosterStructure(unittest.TestCase):
         self.assertEqual(dict(counts), VILLAGE_SECTORS)
 
     def test_key_env_split(self):
-        # key 恰 2 人（chen/lily）、env 恰 23 人
+        # key 恰 3 人（chen/lily/tavern_sun）、env 恰 22 人
         key_ids = sorted(seed.npc_id for seed in VILLAGE_ROSTER
                          if seed.kind == "key")
-        self.assertEqual(key_ids, ["chen", "lily"])
+        self.assertEqual(key_ids, ["chen", "lily", "tavern_sun"])
         env_count = sum(1 for seed in VILLAGE_ROSTER if seed.kind == "env")
-        self.assertEqual(env_count, 23)
+        self.assertEqual(env_count, 22)
 
     def test_farmer_occupation_exactly_five(self):
         # 单职业「农夫」类恰 5 人（farming 长尾基座）：id 集合按任务书
@@ -370,18 +371,18 @@ class TestKeyEnvLayering(unittest.TestCase):
                             if p.seed.kind == "env"}
 
     def test_key_npcs_mind_none_ledger_present(self):
-        # chen/lily：mind is None（人格由引擎常驻账本接管），ledger 非空
-        self.assertEqual(set(self.key_profiles), {"chen", "lily"})
+        # chen/lily/tavern_sun：mind is None（人格由引擎常驻账本接管），ledger 非空
+        self.assertEqual(set(self.key_profiles), {"chen", "lily", "tavern_sun"})
         for npc_id, profile in self.key_profiles.items():
             self.assertIsNone(profile.mind, msg=f"{npc_id} key 不应有 EnvMind")
             self.assertTrue(profile.ledger.all_tags(),
                             msg=f"{npc_id} 账本为空")
 
     def test_env_minds_calm_band(self):
-        # 23 env：mind 为 EnvMind 且四维落在常人平稳带
+        # 22 env：mind 为 EnvMind 且四维落在常人平稳带
         # （p_fatigue/p_hunger ∈ [0.10,0.30]、e_P ∈ [0.40,0.60]、
         #   S_stress ∈ [0.05,0.25]——背景稳态不是戏剧化极端值）
-        self.assertEqual(len(self.env_profiles), 23)
+        self.assertEqual(len(self.env_profiles), 22)
         for npc_id, profile in self.env_profiles.items():
             mind = profile.mind
             self.assertIsInstance(mind, EnvMind, msg=npc_id)
@@ -514,7 +515,7 @@ class TestNewcomerConfigs(unittest.TestCase):
                          "village_roster")
 
     def test_exactly_fifteen_configs(self):
-        # 恰 15 份（25 - 2 key - 8 旧背景），id 无重复
+        # 恰 15 份（25 - 3 key - 7 旧背景），id 无重复
         self.assertEqual(len(self.configs), 15)
         self.assertEqual(len({cfg["id"] for cfg in self.configs}), 15)
 
@@ -529,7 +530,7 @@ class TestNewcomerConfigs(unittest.TestCase):
             self.assertTrue(cfg["schedule"], msg=cfg["id"])
 
     def test_ids_match_roster_newcomers(self):
-        # id 与 VILLAGE_ROSTER 中 env 新增 15 人集合全等（旧 8 背景 NPC
+        # id 与 VILLAGE_ROSTER 中 env 新增 15 人集合全等（旧 7 背景 NPC
         # 已有 configs/background_npcs/ 配置，不在 village_roster 目录）
         roster_env_ids = {seed.npc_id for seed in VILLAGE_ROSTER
                           if seed.kind == "env"}
@@ -580,22 +581,22 @@ class TestNewcomerConfigs(unittest.TestCase):
 class TestEnvZeroLLM(unittest.TestCase):
     """15 新背景 NPC 全天 24 tick 纯规则驱动：调用计数与 token 双口径零消耗。
 
-    实体口径：npc_configs 显式传 Persona.load_all()（chen/lily 两核心）+
-    background_configs 显式传 load_newcomer_configs()（15 新背景）→
-    engine.py:66-75 显式传入按传入值，生产目录 8 旧背景不加载，引擎内
-    2+15=17 实体（任务书预期口径，不断言 25）。
+    实体口径：npc_configs 显式传 Persona.load_all()（chen/lily/tavern_sun
+    三核心）+ background_configs 显式传 load_newcomer_configs()（15 新背景）
+    → engine.py:66-75 显式传入按传入值，生产目录 7 旧背景不加载，引擎内
+    3+15=18 实体（任务书预期口径，不断言 25）。
     """
 
-    def test_engine_scale_17_npcs_33_locations(self):
-        # 17 实体口径：2 核心 + 15 新背景全在场；33 地点 = 既有 17 ∪
+    def test_engine_scale_18_npcs_33_locations(self):
+        # 18 实体口径：3 核心 + 15 新背景全在场；33 地点 = 既有 17 ∪
         # NEW 14 ∪ farm/river（T4-a 地点扩容后 locations.json 全量注册）
         engine = make_full_village_engine()
-        self.assertEqual(len(engine.npcs), 2)
-        self.assertEqual(set(engine.npcs), {"chen", "lily"})
+        self.assertEqual(len(engine.npcs), 3)
+        self.assertEqual(set(engine.npcs), {"chen", "lily", "tavern_sun"})
         newcomer_ids = {cfg["id"] for cfg in load_newcomer_configs()}
         self.assertEqual(len(newcomer_ids), 15)
         self.assertEqual(set(engine.background_npcs), newcomer_ids)
-        for npc_id in newcomer_ids | {"chen", "lily"}:
+        for npc_id in newcomer_ids | {"chen", "lily", "tavern_sun"}:
             self.assertIn(npc_id, engine.world.entities, msg=npc_id)
         legacy = legacy_location_ids()
         self.assertEqual(len(legacy), 33)

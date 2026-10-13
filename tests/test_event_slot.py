@@ -296,7 +296,7 @@ class TestBackgroundNPCEventPerception(unittest.TestCase):
     """新增：背景 NPC 的环境事件可被同地点 NPC 感知（G3 契约延续）。"""
 
     def setUp(self):
-        # 默认引擎加载全部 10 NPC（2 核心 + 8 背景）
+        # 默认引擎加载全部村庄 NPC（T4-b 收尾段后：3 核心 + 22 背景）
         self.engine = NPCEngine(llm=MockLLMProvider())
 
     def test_baker_liu_event_perceived_by_same_location(self):

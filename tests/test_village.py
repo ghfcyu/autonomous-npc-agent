@@ -1,7 +1,7 @@
 """G6-A 小村庄规模与行为契约验收测试。
 
 验收维度（8 个用例，统一构造 NPCEngine(llm=MockLLMProvider()) 全默认扫描 configs/）：
-1. NPC 规模：核心 2 + 背景 ≥8 = 总 ≥10
+1. NPC 规模：核心 3 + 背景 ≥8 = 总 ≥10
 2. 地点规模：≥15 个，三类齐全 shop ≥5 / public ≥2 / residence ≥8
 3. 全员居所已注册：每个 NPC 的 residence 值在 world.locations 中存在
 4. 背景 NPC 零 LLM + 规则反应产出 npc_action
@@ -29,10 +29,11 @@ class TestVillage(unittest.TestCase):
     # ---------------------------------------------------------------- #
     def test_village_has_enough_npcs(self):
         engine = self.engine
-        # 核心 NPC 恰好 2 个：chen + lily
-        self.assertEqual(len(engine.npcs), 2)
+        # 核心 NPC 恰好 3 个：chen + lily + tavern_sun（T4-b 收尾升级）
+        self.assertEqual(len(engine.npcs), 3)
         self.assertIn("chen", engine.npcs)
         self.assertIn("lily", engine.npcs)
+        self.assertIn("tavern_sun", engine.npcs)
         # 背景 NPC ≥ 8，且包含 old_zhang、guard_wang
         self.assertGreaterEqual(len(engine.background_npcs), 8)
         self.assertIn("old_zhang", engine.background_npcs)

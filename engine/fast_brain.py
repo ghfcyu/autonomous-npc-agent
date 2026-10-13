@@ -213,12 +213,15 @@ _PRICE_LINES: Dict[str, str] = {
     "铁锤": "铁锤三两，包砸不卷刃。",
     "皮甲": "皮甲五两，看料加价。",
     "干粮": "干粮一钱一包。",
+    "米酒": "米酒一钱一碗，三钱一坛。",
+    "酱肉": "酱肉两钱一盘，下酒正好。",
 }
 # role → 经营范围商品集合：白名单外的商品一律不得报出报价（越界走
 # 通用句），无经营范围的职业（如 villager）全部走通用句。
 _ROLE_GOODS: Dict[str, frozenset] = {
     "blacksmith": frozenset({"铁剑", "铁锤"}),
     "merchant": frozenset({"皮甲", "干粮"}),
+    "tavern_owner": frozenset({"米酒", "酱肉"}),
 }
 _DEFAULT_PRICE = "看货定价，童叟无欺。"
 

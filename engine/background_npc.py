@@ -4,10 +4,16 @@ T4-b 第二小步（2026-10-12）：可选持有 4D 压缩稳态 EnvMind（Tier 
 封印——数值与英文字段名不进任何 LLM prompt，零 LLM 零 prompt）：
 反应文案按状态带拼接纯中文变体后缀，并随作息 tick 每小时离散演化
 （无表项小时沿用当前作息状态，状态延续语义）。
+
+T4-c 敌意边行为出口（2026-10-13）：可选注入关系网，事件 actor 命中
+敌意边（self→actor 且 affinity<0）时反应文案前拼敌意前缀——社会
+层前缀优先于 EnvMind 生理层后缀（同时命中只取前缀，至多一条纪律），
+纯文案拼接零 LLM 零 prompt。
 """
 from __future__ import annotations
 from dataclasses import replace
 from typing import Any, Dict, List, Optional
+from .relationships import RelationshipNetwork
 from .village_genesis import EnvMind
 from .world import World, WorldEvent, Entity
 
@@ -31,6 +37,17 @@ MIND_EVOLUTION_RATES: dict = {
     "SLEEPING": (-0.15, -0.02, -0.03, -0.05),
 }
 
+# T4-c 敌意边行为出口：事件 actor 命中敌意边（self→actor 且
+# affinity<0）时拼接在反应文案前的前缀池。文案克制（每条括注
+# ≤6 字）；确定性轮转与模板轮换同构（同一 _reaction_counter
+# 计数取模）。社会层前缀优先于 EnvMind 生理层后缀（同时命中
+# 只取前缀不叠加，至多一条纪律）。
+HOSTILE_PREFIXES: tuple[str, ...] = (
+    "（冷哼一声）",
+    "（把脸别过去）",
+    "（头也不抬）",
+)
+
 
 class BackgroundNPC:
     """背景 NPC：只有身份+一句概括+关系，不跑 LLM，事件触发纯规则反应。
@@ -45,13 +62,18 @@ class BackgroundNPC:
       每小时演化（无表项小时沿用当前作息状态）——纯 Tier 0/1 规则计算，零 LLM 零 prompt（封印语义：
       EnvMind 数值与英文字段名不进任何 LLM prompt，行为出口仅为
       npc_action 文案变体）
+    - T4-c 敌意边行为出口：可选注入关系网（relationships=None 时
+      行为与旧版完全一致），事件 actor 命中敌意边（self→actor 且
+      affinity<0）时反应文案前拼敌意前缀——社会层优先于 EnvMind
+      生理层后缀，同时命中只取前缀不叠加（至多一条纪律）
     - 反应同 hour 判重（第十二次审查落地）：判重键 (hour, event.kind)——
       同一小时内对同一事件类型至多发布一条 npc_action（位置过滤通过
       才计配额，跨 hour 自动恢复），hour 口径与 EnvMind 演化层
       _last_evolved_hour 一致（self._world.hour）
     """
     def __init__(self, config: Dict[str, Any], world: World,
-                 env_mind: Optional[EnvMind] = None) -> None:
+                 env_mind: Optional[EnvMind] = None,
+                 relationships: Optional[RelationshipNetwork] = None) -> None:
         self._id = config["id"]
         self._name = config["name"]
         self._role = config.get("role", "background")
@@ -72,6 +94,9 @@ class BackgroundNPC:
         # 多次 tick 判重（10 分钟粒度一天 144 次 tick 只演化一步）。
         self._mind: Optional[EnvMind] = env_mind
         self._last_evolved_hour: Optional[int] = None
+        # T4-c 敌意边行为出口：关系网引用（None 时敌意检查恒空串，
+        # 行为与旧版完全一致）；仅文案层消费，零 LLM 零 prompt 注入。
+        self._relationships = relationships
 
         # 注册实体到世界
         self._entity = Entity(
@@ -184,8 +209,16 @@ class BackgroundNPC:
         self._reaction_counter[event.kind] = counter + 1
         # 格式化反应文本并发布
         text = self._format_reaction(template, event)
-        # T4-b 第二小步：按 EnvMind 状态带拼接纯中文变体后缀（零 LLM）。
-        text += self._variant_suffix()
+        # T4-c 敌意边前缀（社会层）优先于 EnvMind 变体后缀（生理层）：
+        # 同时命中只取敌意前缀、不叠加后缀（至多一条纪律）；无敌意
+        # 命中时 EnvMind 路径与旧版完全一致。文案层位于判重之后、
+        # 发布之前，不改变判重行为。
+        hostile = self._hostile_prefix(event.actor, counter)
+        if hostile:
+            text = hostile + text
+        else:
+            # T4-b 第二小步：按 EnvMind 状态带拼接纯中文变体后缀（零 LLM）。
+            text += self._variant_suffix()
         self._world.bus.publish(WorldEvent(
             self._world.tick_count, "npc_action", self._id,
             {"summary": text, "npc": self._id}
@@ -199,6 +232,21 @@ class BackgroundNPC:
             return template.format(**fmt_kwargs)
         except (KeyError, IndexError, ValueError):
             return template.replace("{npc_name}", self._name)
+
+    def _hostile_prefix(self, actor: str, counter: int) -> str:
+        """敌意关系边变体前缀（纯中文文案拼接，零 LLM 零 prompt）。
+
+        关系网未注入（None）、actor 为空/为玩家、或 self→actor 无敌意
+        边（get_relation_to 未命中或 affinity≥0）时返回空串——文案
+        路径与旧版完全一致。命中时按本次反应的既有触发计数取模
+        确定性轮转前缀（与模板轮换同构：同一计数器同一取模机制）。
+        """
+        if self._relationships is None or not actor or actor == "player":
+            return ""
+        rel = self._relationships.get_relation_to(self._id, actor)
+        if rel is None or rel.affinity >= 0:
+            return ""
+        return HOSTILE_PREFIXES[counter % len(HOSTILE_PREFIXES)]
 
     def _variant_suffix(self) -> str:
         """EnvMind 状态带变体后缀（纯中文文案拼接，零 LLM 零 prompt）。

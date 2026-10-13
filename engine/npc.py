@@ -137,6 +137,8 @@ class NPC:
             return ["铁剑", "铁矿石", "锤子"]
         if self.persona.role == "merchant":
             return ["皮甲", "干粮", "地图"]
+        if self.persona.role == "tavern_owner":
+            return ["米酒", "酱肉"]
         return []
 
     # ------------------------------------------------------------------ #

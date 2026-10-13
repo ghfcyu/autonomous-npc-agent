@@ -16,7 +16,7 @@
   -0.05)，元组序=p_fatigue,p_hunger,e_P,S_stress，clamp [0,1]，同 hour
   多次调用只演化一步）；③ ``mind`` property（frozen，演化生成新实例）；
   ④ ``to_dict()`` 新增 ``env_mind`` 键（None 或 4D 两位小数 dict）；
-- 引擎默认构造 23 背景全员经 ``env_mind_for(config["id"])`` 注入；显式
+- 引擎默认构造 22 背景全员经 ``env_mind_for(config["id"])`` 注入；显式
   传 background_configs 且 id 不在 ROSTER 时 mind=None（行为与旧版一致）；
 - 封印与零 LLM 维持（Tier 0/1）：EnvMind 数值与英文字段名不进任何
   LLM prompt，背景 NPC 全天零 LLM 调用。
@@ -192,10 +192,14 @@ class TestEnvMindFor(unittest.TestCase):
 
     def test_key_npcs_return_none(self):
         # key NPC：8D 全量由运行时 InnerState 承载，无 4D 压缩稳态
+        # （tavern_sun 升级核心后同口径：花名册 kind=key → mind=None）
         self.assertIsNone(env_mind_for("chen"),
                            msg="key NPC chen 不应有 EnvMind（8D 由引擎常驻账本接管）")
         self.assertIsNone(env_mind_for("lily"),
                            msg="key NPC lily 不应有 EnvMind（8D 由引擎常驻账本接管）")
+        self.assertIsNone(env_mind_for("tavern_sun"),
+                           msg="升级核心的 tavern_sun 不应有 EnvMind（8D 由引擎"
+                               "常驻账本接管）")
 
     def test_unknown_id_returns_none(self):
         self.assertIsNone(env_mind_for("nobody_x"),
@@ -203,17 +207,18 @@ class TestEnvMindFor(unittest.TestCase):
 
 
 # ========================================================================== #
-# 2. TestMindInjection —— 引擎装配：默认 23 人全员注入 / 花名册外 None
+# 2. TestMindInjection —— 引擎装配：默认 22 人全员注入 / 花名册外 None
 # ========================================================================== #
 @unittest.skipUnless(NPC_READY, _SKIP_NPC)
 class TestMindInjection(unittest.TestCase):
-    """引擎注入契约：默认构造 23 背景全员有 mind；显式传入 id 不在
+    """引擎注入契约：默认构造 22 背景全员有 mind；显式传入 id 不在
     VILLAGE_ROSTER 时 mind=None（行为与旧版完全一致）；to_dict 观测出口。"""
 
-    def test_default_engine_injects_all_23(self):
+    def test_default_engine_injects_all_22(self):
         engine = NPCEngine(llm=MockLLMProvider())
-        self.assertEqual(len(engine.background_npcs), 23,
-                         msg="默认构造（生产/演示路径）应 23 位背景村民（旧 8+新 15）")
+        self.assertEqual(len(engine.background_npcs), 22,
+                         msg="默认构造（生产/演示路径）应 22 位背景村民（旧 7+新 15，"
+                             "tavern_sun 升级核心后移出背景层）")
         for bg_id, bg in engine.background_npcs.items():
             self.assertIsNotNone(
                 bg.mind, msg=f"{bg_id} 默认构造应经 env_mind_for 注入 4D EnvMind")
@@ -484,13 +489,13 @@ class TestRuntimeVisibility(unittest.TestCase):
 # ========================================================================== #
 class TestZeroLLMMaintained(unittest.TestCase):
     """验收②：全天 24 次 tick(60)（含 EnvMind 每小时演化）+ 4 句慢脑硬保护
-    对话 → 恰 4 次 LLM 调用（仅核心对话）；23 个背景 NPC 不持有任何 LLM
+    对话 → 恰 4 次 LLM 调用（仅核心对话）；22 个背景 NPC 不持有任何 LLM
     调用路径（Tier 0/1 架构封印维持）。"""
 
     def test_full_day_and_dialogue_background_zero_llm(self):
         engine = NPCEngine(llm=MockLLMProvider())
-        self.assertEqual(len(engine.background_npcs), 23,
-                         msg="默认引擎规模前置：23 位背景村民")
+        self.assertEqual(len(engine.background_npcs), 22,
+                         msg="默认引擎规模前置：22 位背景村民")
         self.assertEqual(engine.llm.call_count, 0,
                          msg="构造后调用计数前置为 0")
         for _ in range(24):
@@ -513,7 +518,7 @@ class TestZeroLLMMaintained(unittest.TestCase):
                               msg=f"{bg_id} 不得持有任何 LLM 调用路径"
                                   f"（Tier 0/1 架构封印）")
         # token 归属仅核心：背景 NPC 不进统计
-        self.assertTrue(set(engine.token_stats) <= {"chen", "lily"},
+        self.assertTrue(set(engine.token_stats) <= {"chen", "lily", "tavern_sun"},
                         msg=f"token 归属应仅核心 NPC，实际 {sorted(engine.token_stats)}")
 
 

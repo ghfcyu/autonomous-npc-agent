@@ -4,7 +4,7 @@
 相关用例为红是「先红后绿」的预期状态，交付合流后应全绿）：
 
 - 规模口径：默认引擎（npc_configs=None 且 background_configs=None）
-  2 核心 + 23 背景（旧 8 ∪ configs/village_roster 15 新住民）= 25 NPC、
+  3 核心 + 22 背景（旧 7 ∪ configs/village_roster 15 新住民）= 25 NPC、
   world 实体 26（含 player）、地点 33（既有 17 ∪ NEW_LOCATION_IDS 14 ∪
   farm/river），类别分布 residence 19 / shop 5 / work 5 / public 4；
 - 工作地映射：12 组初始工作地锁定（含旧背景 farmer_zhao→farm、
@@ -52,10 +52,10 @@ from engine.world import World
 # 测试脚手架
 # ---------------------------------------------------------------------- #
 def default_village_engine() -> NPCEngine:
-    """默认构造引擎（生产/演示路径）：核心 2 + 背景 23 = 25 NPC。
+    """默认构造引擎（生产/演示路径）：核心 3 + 背景 22 = 25 NPC。
 
     npc_configs=None 且 background_configs=None → 自动加载
-    configs/npcs/（chen/lily）+ configs/background_npcs/（旧 8）+
+    configs/npcs/（chen/lily/tavern_sun）+ configs/background_npcs/（旧 7）+
     configs/village_roster/（新 15，经 village_genesis.load_newcomer_configs）。
     """
     return NPCEngine(llm=MockLLMProvider())
@@ -75,7 +75,7 @@ class RecordingLLM(MockLLMProvider):
 
 
 def legacy_background_ids():
-    """旧 8 背景 NPC 的 npc_id 集合（configs/background_npcs/ 动态对账）。"""
+    """旧 7 背景 NPC 的 npc_id 集合（configs/background_npcs/ 动态对账）。"""
     ids = set()
     for fname in sorted(os.listdir(DEFAULT_BG_CONFIG_DIR)):
         if fname.endswith(".json"):
@@ -116,7 +116,7 @@ def nearby_rows(user_prompt):
 # 1. TestVillageScale —— 25 人 / 26 实体 / 33 地点规模锁
 # ========================================================================== #
 class TestVillageScale(unittest.TestCase):
-    """默认引擎规模契约：2 核心 + 23 背景 = 25 NPC、实体 26（含 player）、
+    """默认引擎规模契约：3 核心 + 22 背景 = 25 NPC、实体 26（含 player）、
     33 地点（residence 19 / shop 5 / work 5 / public 4）、NEW 14 全在场。"""
 
     def setUp(self):
@@ -124,13 +124,14 @@ class TestVillageScale(unittest.TestCase):
 
     def test_25_npcs_and_26_entities(self):
         engine = self.engine
-        self.assertEqual(len(engine.npcs), 2)
-        self.assertEqual(set(engine.npcs), {"chen", "lily"})
-        # 背景 23 = 旧 8 + 新 15（动态对账，不硬编码清单）
-        self.assertEqual(len(engine.background_npcs), 23)
+        self.assertEqual(len(engine.npcs), 3)
+        self.assertEqual(set(engine.npcs), {"chen", "lily", "tavern_sun"})
+        # 背景 22 = 旧 7 + 新 15（动态对账，不硬编码清单；tavern_sun
+        # 升级核心后移出背景层）
+        self.assertEqual(len(engine.background_npcs), 22)
         self.assertEqual(set(engine.background_npcs),
                          legacy_background_ids() | newcomer_ids())
-        self.assertEqual(len(legacy_background_ids()), 8)
+        self.assertEqual(len(legacy_background_ids()), 7)
         self.assertEqual(len(newcomer_ids()), 15)
         # 25 NPC 全员 + player = 26 实体
         self.assertEqual(len(engine.world.entities), 26)
@@ -207,7 +208,11 @@ class TestWorkplaceMapping(unittest.TestCase):
 # 3. TestColocation —— 共居落位（提案 A8-1）
 # ========================================================================== #
 class TestColocation(unittest.TestCase):
-    """共居契约：四组同 residence 共居；夜间 tick 后实体真实聚居同屋檐。"""
+    """共居契约：四组同 residence 共居；夜间 tick 后实体真实聚居同屋檐。
+
+    house_sun 为跨层共居组（tavern_sun 升级核心后）：核心 tavern_sun
+    （persona.residence）与背景 tavern_aman（bg.residence）分层归属、
+    同屋檐物理共居。"""
 
     GROUPS = {
         "house_zhao": ("farmer_zhao", "farmer_wang", "zhao_daniu", "farmhand_sun"),
@@ -219,14 +224,36 @@ class TestColocation(unittest.TestCase):
     def setUp(self):
         self.engine = default_village_engine()
 
+    def _residence_of(self, npc_id):
+        """成员居所（跨层解析：核心走 persona.residence，背景走 bg.residence）。"""
+        if npc_id in self.engine.npcs:
+            return self.engine.npcs[npc_id].persona.residence
+        return self.engine.background_npcs[npc_id].residence
+
+    def _entity_of(self, npc_id):
+        """成员实体（跨层解析：核心与背景各自持 entity，同一 world）。"""
+        if npc_id in self.engine.npcs:
+            return self.engine.npcs[npc_id].entity
+        return self.engine.background_npcs[npc_id].entity
+
     def test_residence_colocation_groups(self):
         for home, members in self.GROUPS.items():
             self.assertIn(home, self.engine.world.locations, msg=home)
             for npc_id in members:
+                self.assertEqual(self._residence_of(npc_id), home,
+                                 msg=f"{npc_id} 应以 {home} 为居所")
+                if npc_id == "tavern_sun":
+                    continue  # 跨层成员在下方精确锁
                 self.assertIn(npc_id, self.engine.background_npcs,
                               msg=f"{home}/{npc_id}")
-                self.assertEqual(self.engine.background_npcs[npc_id].residence,
-                                 home, msg=f"{npc_id} 应以 {home} 为居所")
+        # house_sun 跨层共居精确锁：tavern_sun 升级核心（居所由
+        # persona.residence 承载），tavern_aman 仍在背景层
+        self.assertIn("tavern_sun", self.engine.npcs,
+                      msg="tavern_sun 升级后应在核心表")
+        self.assertEqual(self.engine.npcs["tavern_sun"].persona.residence,
+                         "house_sun", msg="核心 tavern_sun 居所应为 house_sun")
+        self.assertNotIn("tavern_sun", self.engine.background_npcs)
+        self.assertIn("tavern_aman", self.engine.background_npcs)
 
     def test_night_placement_real_colocation(self):
         # 推进穿过各组就寝时刻（19/20/21/22 点）：共居者夜间真实聚居
@@ -236,8 +263,14 @@ class TestColocation(unittest.TestCase):
         for home, members in self.GROUPS.items():
             for npc_id in members:
                 self.assertEqual(
-                    self.engine.background_npcs[npc_id].entity.location_id,
+                    self._entity_of(npc_id).location_id,
                     home, msg=f"{npc_id} 夜间应在家 {home}（共居落位）")
+        # house_sun 跨层夜间同屋檐：核心 tavern_sun 与背景 tavern_aman
+        # 两 entity 同在 house_sun（分层不破坏共居物理事实）
+        self.assertEqual(
+            [self._entity_of(m).location_id for m in self.GROUPS["house_sun"]],
+            ["house_sun", "house_sun"],
+            msg="tavern_sun/tavern_aman 夜间应同在 house_sun")
 
 
 # ========================================================================== #
@@ -311,7 +344,7 @@ class TestVillageFullDay(unittest.TestCase):
         status = engine.status()
         ids = {entry.get("id") for entry in status["npcs"]}
         roster_ids = {seed.npc_id for seed in VILLAGE_ROSTER}
-        # 背景 23 人全在 status（连同核心 2 人 = 花名册 25 人全员）
+        # 背景 22 人全在 status（连同核心 3 人 = 花名册 25 人全员）
         self.assertEqual(ids, roster_ids)
         self.assertEqual(len(ids), 25)
 
@@ -321,7 +354,7 @@ class TestVillageFullDay(unittest.TestCase):
 # ========================================================================== #
 class TestEnvZeroLLM25(unittest.TestCase):
     """25 人规模零 LLM 双口径：全天 24 tick 纯规则驱动（调用计数与 token
-    双零）+ 1 句复杂对话恰 1 次慢脑调用，token 归属仅核心——23 个背景
+    双零）+ 1 句复杂对话恰 1 次慢脑调用，token 归属仅核心——22 个背景
     NPC 全部零条目（见 test_village_genesis.py 的 TestEnvZeroLLM 同款
     双口径写法，本类为 25 人默认构造口径）。"""
 
@@ -329,7 +362,7 @@ class TestEnvZeroLLM25(unittest.TestCase):
 
     def test_full_day_and_dialogue_zero_llm_for_background(self):
         engine = default_village_engine()
-        self.assertEqual(len(engine.background_npcs), 23)  # 25 人规模前置
+        self.assertEqual(len(engine.background_npcs), 22)  # 25 人规模前置
         self.assertEqual(engine.llm.call_count, 0)
         self.assertEqual(engine.llm.total_tokens_used, 0)
         # (a) 全天 24 tick 纯规则驱动：零 LLM 调用、零 token
@@ -349,7 +382,7 @@ class TestEnvZeroLLM25(unittest.TestCase):
                              f"实际 {engine.llm.call_count}")
         after = engine.status()["token_stats"]
         self.assertGreater(after["total_tokens"], 0)
-        # token 归属仅核心 NPC：23 个背景 NPC 全部零条目
+        # token 归属仅核心 NPC：22 个背景 NPC 全部零条目
         self.assertEqual(set(after["by_npc"]), {"chen"},
                          msg="token 归属应仅核心 NPC")
         for bg_id in engine.background_npcs:
@@ -390,11 +423,12 @@ class TestNearbyLimit(unittest.TestCase):
     """同地点 7 实体（chen + 6 背景）→ user prompt【周围的人】块 ≤5 行；
     给 chen 手工加 2 条高 |affinity| 关系 → 高亲缘实体行排在低亲缘前。"""
 
-    # 6 个背景 NPC 移到 forge 与 chen 同地（7 实体；玩家留在 plaza 不入镜）
-    BG_IDS = ("baker_liu", "doc_qin", "tavern_sun",
+    # 6 个背景 NPC 移到 forge 与 chen 同地（7 实体；玩家留在 plaza 不入镜；
+    # tavern_sun 升级核心后换入同为背景层的 miller_qian，保持 6 背景）
+    BG_IDS = ("baker_liu", "doc_qin", "miller_qian",
               "weaver_yang", "old_zhang", "guard_wang")
     BG_NAMES = {"baker_liu": "刘婶", "doc_qin": "秦大夫",
-                "tavern_sun": "孙老三", "weaver_yang": "杨大姐",
+                "miller_qian": "钱多福", "weaver_yang": "杨大姐",
                 "old_zhang": "老张", "guard_wang": "王守卫"}
     # 慢脑必达句（超全部快脑句长闸门，见 test_village_genesis 同款）
     COMPLEX_SENTENCE = "最近铁价如何？我想订一批农具"
@@ -435,20 +469,20 @@ class TestNearbyLimit(unittest.TestCase):
 
     def test_nearby_sorted_by_affinity_desc(self):
         engine = self._make_engine()
-        # 手工加 2 条高 |affinity| 关系（chen → doc_qin 0.95 / tavern_sun 0.85）
+        # 手工加 2 条高 |affinity| 关系（chen → doc_qin 0.95 / miller_qian 0.85）
         engine.relationships.add(Relationship(
             source_id="chen", target_id="doc_qin",
             relation="老友", affinity=0.95, target_name="秦大夫"))
         engine.relationships.add(Relationship(
-            source_id="chen", target_id="tavern_sun",
-            relation="酒友", affinity=0.85, target_name="孙老三"))
+            source_id="chen", target_id="miller_qian",
+            relation="主顾", affinity=0.85, target_name="钱多福"))
         result = engine.player_says(self.COMPLEX_SENTENCE, "chen")
         self.assertEqual(result["brain"], "slow")
         rows = nearby_rows(self._user_prompt_of_last_call(engine))
         self.assertLessEqual(len(rows), 5)
         # 高 |affinity| 实体必在截断后的行内（排在最前不被挤出）
         self.assertIn("秦大夫", rows[0], msg=f"最高亲缘应排首位: {rows}")
-        self.assertIn("孙老三", rows[1], msg=f"次高亲缘应排第二: {rows}")
+        self.assertIn("钱多福", rows[1], msg=f"次高亲缘应排第二: {rows}")
         # 低亲缘（无关系记 0.0）实体行出现在高亲缘之后
         # （old_zhang 的背景配置名为「老张」，与花名册叙事名「老张头」不同）
         low_rows = [i for i, row in enumerate(rows) if "老张" in row]

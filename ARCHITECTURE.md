@@ -112,6 +112,17 @@ EnvMind 4D 行为消费数据流（T4-b 第二小步，2026-10-12）：
         → BackgroundNPC.apply_schedule(hour) 作息段内每小时演化一步
           （状态延续：无表项小时沿用 _current_state）
         → _on_event 发布前 _variant_suffix() 按状态带拼接变体后缀
+
+敌意边行为出口数据流（T4-c，2026-10-13）：
+    RelationshipNetwork 引擎构造时注入（第四参，None 向后兼容）
+        → _on_event 文案层 _hostile_prefix(actor) 查敌意边
+          （self→actor 且 affinity<0，actor 为玩家/空不触发）
+        → 命中 → 反应文案前拼确定性轮转敌意前缀（冷哼一声/
+          把脸别过去/头也不抬，与模板轮换同构取模）
+        → 优先级：敌意前缀（社会层）> EnvMind 变体后缀（生理层），
+          同时命中至多取敌意一条（文案克制纪律）
+        → 冤家关系（渔夫↔磨坊主 -0.55/-0.6 双向）玩家可感知，
+          零 LLM 零 prompt，T6 把柄勒索的反应层基础设施
 ```
 
 - **BackgroundNPC**：轻量级 NPC，不持有 LLM 引用（架构上不可能调用 LLM），不维护记忆/完整内状态（InnerState 8D）/状态机；T4-b 起可选持有 4D 压缩稳态 EnvMind（非 InnerState 8D，env_mind=None 时行为与旧版完全一致）
@@ -119,6 +130,7 @@ EnvMind 4D 行为消费数据流（T4-b 第二小步，2026-10-12）：
 - **规则反应**：对配置了模板的事件类型产生确定性反应——`env_event` 只反应同地点、`entity_moved` 只反应有人来到自己地点，模板按计数器取模轮转，`{npc_name}` 替换为 NPC 名；**反应同 hour 判重（2026-10-13，第十二次审查落地）**：同一小时内对同一事件类型至多发布一条 npc_action（判重键 `(hour, event.kind)`，位置过滤通过才计配额、跨 hour 自动恢复），与 EnvMind 演化层 `_last_evolved_hour` 同 hour 口径——消灭"farmer_zhao 同小时对同类事件三连复读"的复读机风险，NPC 反应符合"活人不会一小时反复念叨同一件事"的叙事
 - **EnvMind 4D 行为消费（T4-b 第二小步，2026-10-12）**：`ENV_MIND_VARIANTS`（字段名/阈值 0.65/纯中文后缀，生理疲劳>饥饿优先于压力与情绪，至多一条）+ `MIND_EVOLUTION_RATES`（WORKING 劳作累积/IDLE 歇脚恢复/SLEEPING 睡眠归平，同 hour 多 tick 靠 hour 变化判重只演化一步，frozen dataclass 经 `dataclasses.replace` 整体替换、clamp [0,1]）；`to_dict()` 末尾附 `env_mind` 快照键（None 时为 None，status 观测出口）。**封印语义精确化**：Tier 0/1 封印 = 不进任何 LLM prompt、不调任何 LLM——EnvMind 数值与英文字段名（p_fatigue 等）永不进 prompt，行为出口为纯中文文案变体拼接，只出现在 npc_action 事件文本中（核心 NPC 感知的是带变体的文案而非 4D 数值）
 - **零 LLM 断言**：MockLLMProvider 记录 `call_count`/`call_log` 与 `total_tokens_used`，测试可断言背景 NPC 的 id 从未出现在调用日志中、且 `total_tokens_used == 0`（以 token 数非调用次数证明零 LLM）
+- **敌意边行为出口（T4-c，2026-10-13）**：`BackgroundNPC` 第四参可选注入 `RelationshipNetwork` 引用（None 时行为与旧版逐字一致——向后兼容）；反应文案层消费敌意关系边：事件 actor 命中敌意边（`get_relation_to(self.id, actor)` 存在且 affinity<0）时文案前拼 `HOSTILE_PREFIXES` 确定性轮转前缀，社会层优先于 EnvMind 生理层后缀（同时命中至多一条）；文案层位于判重之后、发布之前，不改变判重行为；零 LLM 零 prompt（Tier 0/1 封印不破），验收见 `tests/test_hostile_edge_behavior.py`（8 用例：敌意分叉/双向敌意对/零 LLM/None 向后兼容/判重兼容/敌意优先于 EnvMind/亲缘边不触发/默认村庄端到端）
 
 ### 3. 决策层（`engine/decision.py`）
 
@@ -155,7 +167,7 @@ EnvMind 4D 行为消费数据流（T4-b 第二小步，2026-10-12）：
 
 - `Persona`：JSON 配置 → 人格对象（性格、背景、语气、对话库、作息表、**标签**、**外观**、**居所**、**脾气掩码 temperament**——垫话引擎的掩码标识，T2 落地 8 掩码后由标签库生成）
 - `NPC`：人格 + 记忆系统 + 状态机 + 决策引擎 + **内状态** 的聚合根，订阅事件总线（记忆写入 + 状态更新双订阅）
-- `NPCEngine`：世界 + NPC 集合的编排入口，暴露 `player_says / player_gives / player_changes_appearance / tick / status` 五个核心 API（`player_gives`：玩家送礼，库存转移或宽松发布事件，NPC 经事件链路记入短期+长期记忆；`player_changes_appearance`：玩家换装，同地点 NPC 感知；`tick`：推进世界时间并对核心+背景 NPC 应用作息驱动位置移动）。全默认构造时自动扫描 `configs/`（npcs + background_npcs + village_roster + relationships + locations），加载小村庄：2 核心 NPC（chen/lily 跑完整决策链）+ 23 背景 NPC（8 既有 + 15 新住民，零 LLM 规则反应，T4-a 正式接入运转）+ 33 地点（四类可探索结构，含 work 作业场所新类别）。`player_says` 后按 NPC 聚合 token 统计（`token_stats`），`status()` 返回 `token_stats` 字段（`by_npc` 按 NPC 聚合 prompt/completion/total/calls，`total_tokens` 为 LLM 累计，`llm_calls` 为调用次数）
+- `NPCEngine`：世界 + NPC 集合的编排入口，暴露 `player_says / player_gives / player_changes_appearance / tick / status` 五个核心 API（`player_gives`：玩家送礼，库存转移或宽松发布事件，NPC 经事件链路记入短期+长期记忆；`player_changes_appearance`：玩家换装，同地点 NPC 感知；`tick`：推进世界时间并对核心+背景 NPC 应用作息驱动位置移动）。全默认构造时自动扫描 `configs/`（npcs + background_npcs + village_roster + relationships + locations），加载小村庄：3 核心 NPC（chen/lily/tavern_sun 跑完整决策链，T4-b 收尾段 10-13 升级酒馆掌柜为第 3 核心）+ 22 背景 NPC（7 既有 + 15 新住民，零 LLM 规则反应，T4-a 正式接入运转）+ 33 地点（四类可探索结构，含 work 作业场所新类别）。`player_says` 后按 NPC 聚合 token 统计（`token_stats`），`status()` 返回 `token_stats` 字段（`by_npc` 按 NPC 聚合 prompt/completion/total/calls，`total_tokens` 为 LLM 累计，`llm_calls` 为调用次数）
 
 ## 数据流（一次对话）
 
@@ -352,7 +364,7 @@ NPCEngine.tick(minutes)
 - 25 NPC 按 6D 正态属性 + 齐普夫职业分布 + 标签金字塔生成；关键 NPC（8D 全量+把柄）vs 环境 NPC（4D 压缩稳态，零 LLM）
 - 行为经济学离散事件化（T5）：EWMA 财富基准、2.5 倍禀赋效应、损失域豪赌；杜希格习惯回路 0-token 截断
 - **第一小步已落地（2026-10-11）**：`engine/village_genesis.py` 离线人口学生成器——25 人齐普夫职业阶层花名册（farming 7 / craft 5 / 特殊职业各 ≤2）+ `generate_village()` 确定性人口学档案（crc32(npc_id) 种子）；关键 NPC 2 人（chen/lily，mind=None，8D 全量由运行时 InnerState 承载）vs 环境 NPC 23 人（`EnvMind` 4D 压缩稳态：p_fatigue/p_hunger/e_P/S_stress 字段名与 8D 严格同名——共线性纪律，常人平稳带初值，Tier 0/1 封印不进任何 prompt）；**单一挂载内核纪律**：原 `NPCEngine._build_tag_ledger` 主体提取为 `tag_mount.build_genesis_ledger`（engine 薄壳委托、签名行为零变化），引擎常驻化 / mount_tags 显式 API / village_genesis 三方复用同一函数（chen 缺陷/把柄挂载双源全等有测试锁）；15 位新住民配置落位 `configs/village_roster/`（共居消化居所增速：赵宅 3 口/药童寄宿秦家/帮工寄宿孙家/学童寄宿私塾宅；更夫 20:00-03:00 夜班作息反转、牧人 04:00 早出），生产路径暂不自动加载——待 T4-a 地点扩容（17→33，NEW_LOCATION_IDS 14 个引用清单）后正式接入运转；正态/齐普夫/金字塔三形状分布断言+环境零 LLM 双口径见 `tests/test_village_genesis.py`（40 用例）；生成器为纯离线数据层，token 基线 4501 零影响
-- **第二小步（T4-a）已落地（2026-10-11 22:00）**：地点 17→**33** 四类扩容——`work` 作业场所新类别 5 处（pasture 牧场/farm 农田/river 河畔/mill 磨坊/carpentry 木匠铺，修复"农夫在广场、渔夫在井边工作"叙事缺陷：farmer_zhao→farm、fisher_zhou→river）+ public 扩至 4（school 私塾/shrine 祠堂）+ residence 扩至 19（9 新居所共居环带，实际唯一居所 19 与提案预估 21 的偏差源：长工住东家 farmhand_sun→house_zhao、帮工住老板家 tavern_aman→house_sun 的额外共居消化，更真实的村落设定）；**15 新住民正式接入运转**：`NPCEngine` 生产/演示路径自动 `load_newcomer_configs()`（复用 village_genesis 单一来源，共 23 背景 NPC），白天农田/河畔/牧场各有其人、21:00 更夫巡村+赵家四口归宅、03:00 更夫收工回家的昼夜分布图成形；**事件池 46 条 25/25 全员覆盖**（15 新住民每人 2 条职业生活文案，尾部追加保轮播首项不变）；**两项 T4-a token 裁剪**：①【周围的人】nearby 按 viewer 亲缘度 |affinity| 降序稳定排序取前 5（`decision.py NEARBY_PROMPT_LIMIT`）——25 NPC 同地点密度护栏；②【人际关系】top-3 截断+类型权重保底（`relationships.py _PRIORITY_RELATION_TYPES`：父子/师徒不因 |affinity| 低被挤出，低好感父亲依然是父亲）；快脑商品词品类后缀边界收紧（`fast_brain.py _GOODS_SUFFIX_CHARS`：「铁剑鞘」不得提取"铁剑"答非所问）；token 基线 4501→4523（运转噪声合法波动 +22，容忍带内，PINNED 同步）；接入运转验收见 `tests/test_village_integration.py`（12 测试类 30 用例：规模/工作地映射/共居/夜班/全天运转/零 LLM 双口径/事件池覆盖/两项裁剪/商品边界/新地点问路）；架构图已同步重画（village_genesis 创生层+接入箭头入图，视觉 QA 8 项全 PASS）；**T4-b 两小步已落地（2026-10-12）**：第一小步关系网 8→44 全员覆盖（见 2.7 节），第二小步 EnvMind 行为消费出口（见 2.8 节，延续语义下变体带真实可达：基线场景 11/23 NPC 日内抵达 0.65+ 带、全天 6 条 npc_action 带后缀，均未进入对话时刻核心 NPC 最近经历窗口，token 基线 4519 零影响）；余项：关键 NPC 升级评估
+- **第二小步（T4-a）已落地（2026-10-11 22:00）**：地点 17→**33** 四类扩容——`work` 作业场所新类别 5 处（pasture 牧场/farm 农田/river 河畔/mill 磨坊/carpentry 木匠铺，修复"农夫在广场、渔夫在井边工作"叙事缺陷：farmer_zhao→farm、fisher_zhou→river）+ public 扩至 4（school 私塾/shrine 祠堂）+ residence 扩至 19（9 新居所共居环带，实际唯一居所 19 与提案预估 21 的偏差源：长工住东家 farmhand_sun→house_zhao、帮工住老板家 tavern_aman→house_sun 的额外共居消化，更真实的村落设定）；**15 新住民正式接入运转**：`NPCEngine` 生产/演示路径自动 `load_newcomer_configs()`（复用 village_genesis 单一来源，共 23 背景 NPC），白天农田/河畔/牧场各有其人、21:00 更夫巡村+赵家四口归宅、03:00 更夫收工回家的昼夜分布图成形；**事件池 46 条 25/25 全员覆盖**（15 新住民每人 2 条职业生活文案，尾部追加保轮播首项不变）；**两项 T4-a token 裁剪**：①【周围的人】nearby 按 viewer 亲缘度 |affinity| 降序稳定排序取前 5（`decision.py NEARBY_PROMPT_LIMIT`）——25 NPC 同地点密度护栏；②【人际关系】top-3 截断+类型权重保底（`relationships.py _PRIORITY_RELATION_TYPES`：父子/师徒不因 |affinity| 低被挤出，低好感父亲依然是父亲）；快脑商品词品类后缀边界收紧（`fast_brain.py _GOODS_SUFFIX_CHARS`：「铁剑鞘」不得提取"铁剑"答非所问）；token 基线 4501→4523（运转噪声合法波动 +22，容忍带内，PINNED 同步）；接入运转验收见 `tests/test_village_integration.py`（12 测试类 30 用例：规模/工作地映射/共居/夜班/全天运转/零 LLM 双口径/事件池覆盖/两项裁剪/商品边界/新地点问路）；架构图已同步重画（village_genesis 创生层+接入箭头入图，视觉 QA 8 项全 PASS）；**T4-b 两小步已落地（2026-10-12）**：第一小步关系网 8→44 全员覆盖（见 2.7 节），第二小步 EnvMind 行为消费出口（见 2.8 节，延续语义下变体带真实可达：基线场景 11/22 NPC 日内抵达 0.65+ 带、全天 6 条 npc_action 带后缀，均未进入对话时刻核心 NPC 最近经历窗口，token 基线 4519 零影响）；**T4-b 收尾段已落地（2026-10-13 22:00）**：tavern_sun 升级第 3 核心 NPC（配置 `configs/npcs/tavern_sun.json`，cheerful 复用掩码+genesis 标签账本常驻化+快脑经营范围米酒/酱肉，记忆/8D 心智/快慢脑/LLM 对话全套；分层 2+23→3+22，token 基线 4519 零变化——其旧背景规则反应事件本就不进核心对话记忆窗口，实测三次严格相等）+ **T4-c 敌意边行为出口**（见 2.8 节：背景反应文案层消费敌意关系边，社会层前缀优先于 EnvMind 生理层后缀，T6 把柄勒索的反应层基础设施）；验收见 `tests/test_tavern_core_npc.py`（9 用例）+ `tests/test_hostile_edge_behavior.py`（8 用例）；余项：分布形状运转期验证
 
 ### 架构图重画硬清单（T3 执行，2026-10-07 固化；2026-10-10 22:00 已重画完成）
 

@@ -62,13 +62,16 @@ class NPCEngine:
 
         # 生成背景 NPC：显式传入配置时完全按传入值；全默认构造（生产/
         # 演示路径）时自动加载 configs/background_npcs/ 并接入
-        # configs/village_roster/ 的 15 位新住民（T4-a 正式接入运转，
-        # 共 23 背景 NPC）；显式传入自定义 npc_configs（测试/嵌入场景）
+        # configs/village_roster/ 的 15 位新住民（T4-a 正式接入运转；
+        # T4-b 收尾段 tavern_sun 升级第 3 核心 NPC 后共 22 背景 NPC =
+        # 7 既有 + 15 新住民）；显式传入自定义 npc_configs（测试/嵌入场景）
         # 时不隐式注入，保证场景可控（既有语义零变化）。
         # load_newcomer_configs 复用 village_genesis 单一来源，
         # 不在本模块复制目录扫描逻辑（两套扫描漂移=共线性死穴）。
         # T4-b 第二小步：三路 bg_configs 统一经 env_mind_for 注入 4D EnvMind
         # 确定性初值（id 不在花名册 / key NPC → None，行为与旧版完全一致）。
+        # T4-c 敌意边行为出口：构造时注入关系网引用（None 向后兼容），
+        # 反应文案层消费敌意边（零 LLM 零 prompt）。
         self.background_npcs: Dict[str, BackgroundNPC] = {}
         if background_configs is not None:
             bg_configs = background_configs
@@ -77,7 +80,8 @@ class NPCEngine:
         else:
             bg_configs = []
         for config in bg_configs:
-            bg = BackgroundNPC(config, self.world, env_mind=env_mind_for(config["id"]))
+            bg = BackgroundNPC(config, self.world, env_mind=env_mind_for(config["id"]),
+                               relationships=self.relationships)
             self.background_npcs[bg.id] = bg
 
     @staticmethod

@@ -2,7 +2,7 @@
 
 被测契约（PM 定稿）：
 - 报告行动态数字：``背景生态 NPC: {len(engine.background_npcs)} 位背景村民...``
-  ——Mock 默认引擎 = 23 位背景村民，不再硬编码 8；
+  ——Mock 默认引擎 = 22 位背景村民，不再硬编码 8；
 - 机制可见性（玩家可感知口径）：「快脑秒回」至少一次且 journal 中
   brain=="fast" 条目 ≥1、「垫话」（0ms 反应性开场白）、「长期记忆」
   （chen 记忆沉淀）、「0 Token」（背景生态 NPC 全程零消耗）。
@@ -50,15 +50,16 @@ class TestHumanSimulationTour(unittest.TestCase):
 
     def test_background_count_line_dynamic_not_hardcoded(self):
         # 前置对账：模拟器所持引擎的背景规模（动态数字的真实来源）
-        self.assertEqual(len(self.sim.engine.background_npcs), 23,
-                         msg="Mock 默认引擎应为 23 位背景村民"
-                             "（旧 8 + T4-a 新住民 15，2 核心+23 背景=25 人村庄）")
-        self.assertIn("23 位背景村民", self.output,
-                      msg="报告行应为动态数字：『背景生态 NPC: 23 位背景村民...』"
+        self.assertEqual(len(self.sim.engine.background_npcs), 22,
+                         msg="Mock 默认引擎应为 22 位背景村民"
+                             "（旧 7 + T4-a 新住民 15，3 核心+22 背景=25 人村庄；"
+                             "tavern_sun 升级核心后移出背景层）")
+        self.assertIn("22 位背景村民", self.output,
+                      msg="报告行应为动态数字：『背景生态 NPC: 22 位背景村民...』"
                           "（取 len(engine.background_npcs)，玩家可感知真实规模）")
         self.assertNotIn("8 位背景村民", self.output,
                           msg="旧硬编码『8 位背景村民』报告行应彻底清除"
-                              "（T4-a 扩容后早已是 23 人）")
+                              "（T4-a 扩容后早已是 22 人）")
 
     def test_fast_brain_takeover_visible(self):
         self.assertIn("快脑秒回", self.output,

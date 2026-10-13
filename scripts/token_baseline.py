@@ -5,7 +5,8 @@
 用于卡住 token 回归（审查硬标准 4400-4800）。
 
 场景：
-    1. 默认 NPCEngine(llm=MockLLMProvider())，加载全部 10 NPC（2 核心 + 8 背景）；
+    1. 默认 NPCEngine(llm=MockLLMProvider())，加载全部 25 NPC（3 核心
+       chen/lily/tavern_sun + 22 背景；基线对话仍为 chen/lily 各 2 句）；
     2. 24 次 tick(60) 模拟一整天（24 小时），NPC 作息驱动运转；
     3. 4 次核心对话（2 chen + 2 lily，用 Mock 话题库能命中的输入）；
     4. 打印 token 统计：按 NPC 分解（prompt/completion/total/calls）、
@@ -17,8 +18,10 @@
 确定性：
     main() 首行 random.seed(42) 固定天气随机（world.py 天气变化走
     random.random()），24 次 tick 的天气事件序列可复现，
-    token 总消耗恒定（4769，T2 收口先行批 chen/lily 挂载常驻化后口径），
-    不随运行波动。
+    token 总消耗恒定（4519，T4-b 关系网 8→44 后口径；2026-10-13
+    tavern_sun 升级第 3 核心 NPC 后复验三次严格相等 4519——升级
+    移出的背景规则反应事件均未进入 chen/lily 对话时刻记忆窗口，
+    结构性零影响），不随运行波动。
 """
 
 from __future__ import annotations
@@ -56,7 +59,7 @@ def main() -> int:
     # 常驻化身份标签行带来的合法增量 4737 → 4769（+32，每 NPC 2 次
     # 调用×8 字符；结构性增量非单点裁剪，实测仍在硬标准内）。
     random.seed(42)
-    # 1) 默认引擎：MockLLMProvider + 全部 10 NPC（2 核心 + 8 背景）
+    # 1) 默认引擎：MockLLMProvider + 全部 25 NPC（3 核心 + 22 背景）
     engine = NPCEngine(llm=MockLLMProvider())
     core_ids = sorted(n for n in engine.npcs if n in CORE_NPCS)
     bg_ids = sorted(n for n in engine.background_npcs)

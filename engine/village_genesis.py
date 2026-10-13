@@ -2,8 +2,8 @@
 
 - 25 人花名册按齐普夫职业阶层（提案 A 人口学版）：farming 7 / hunt 1 /
   craft 5 / trade 2 / medicine 2 / tavern 2 / education 2 / guard 2 / idle 2；
-- 关键 NPC 2 人（chen/lily，8D 全量，运行时由既有 InnerState 承载）
-  vs 环境 NPC 23 人（4D 压缩稳态 EnvMind，Tier 0/1 封印零 LLM）；
+- 关键 NPC 3 人（chen/lily/tavern_sun，8D 全量，运行时由既有 InnerState 承载）
+  vs 环境 NPC 22 人（4D 压缩稳态 EnvMind，Tier 0/1 封印零 LLM）；
 - 本模块为离线创生层：产物（先天属性/EnvMind/账本摘要）不进运行时
   prompt，<35token 红线天然不涉及；
 - 单一挂载内核纪律：缺陷+把柄+高显著度称号挂载全部复用
@@ -53,15 +53,18 @@ class VillagerSeed:
 
 
 # 25 人花名册（PM 世界观设定，人名与阶层归属不得改动）：
-# key 2 人（既有引擎核心）+ env 23 人（farming 7 / hunt 1 / craft 4 /
-# trade 1 / medicine 2 / tavern 2 / education 2 / guard 2 / idle 2）。
+# key 3 人（既有引擎核心 chen/lily + T4-b 收尾升级核心的 tavern_sun）
+# + env 22 人（farming 7 / hunt 1 / craft 4 / trade 1 / medicine 2 /
+# tavern 1 / education 2 / guard 2 / idle 2）。
 # sector 总计数（key 计入所属 sector）：craft 5 = 4 env + chen；
-# trade 2 = 1 env + lily —— 与 VILLAGE_SECTORS 逐键对账。
+# trade 2 = 1 env + lily；tavern 2 = 1 env(tavern_aman) + 1 key
+# (tavern_sun) —— 与 VILLAGE_SECTORS 逐键对账。
 VILLAGE_ROSTER: tuple[VillagerSeed, ...] = (
-    # 关键 NPC（kind="key"，2 人，8D 全量由运行时 InnerState 承载）
+    # 关键 NPC（kind="key"，3 人，8D 全量由运行时 InnerState 承载）
     VillagerSeed(npc_id="chen", name="铁匠陈", kind="key", sector="craft", occupation="铁匠"),
     VillagerSeed(npc_id="lily", name="行商莉莉", kind="key", sector="trade", occupation="行商"),
-    # 环境 NPC（kind="env"，23 人，Tier 0/1 封印零 LLM）
+    VillagerSeed(npc_id="tavern_sun", name="孙老三", kind="key", sector="tavern", occupation="酒馆老板"),
+    # 环境 NPC（kind="env"，22 人，Tier 0/1 封印零 LLM）
     VillagerSeed(npc_id="farmer_zhao", name="赵老汉", kind="env", sector="farming", occupation="农夫"),
     VillagerSeed(npc_id="farmer_wang", name="王氏", kind="env", sector="farming", occupation="农妇"),
     VillagerSeed(npc_id="zhao_daniu", name="赵大牛", kind="env", sector="farming", occupation="农夫"),
@@ -77,7 +80,6 @@ VILLAGE_ROSTER: tuple[VillagerSeed, ...] = (
     VillagerSeed(npc_id="peddler_luo", name="罗四方", kind="env", sector="trade", occupation="货郎"),
     VillagerSeed(npc_id="doc_qin", name="秦大夫", kind="env", sector="medicine", occupation="大夫"),
     VillagerSeed(npc_id="herb_boy", name="小蓟", kind="env", sector="medicine", occupation="药童"),
-    VillagerSeed(npc_id="tavern_sun", name="孙老三", kind="env", sector="tavern", occupation="酒馆老板"),
     VillagerSeed(npc_id="tavern_aman", name="阿满", kind="env", sector="tavern", occupation="酒馆帮工"),
     VillagerSeed(npc_id="master_wen", name="文先生", kind="env", sector="education", occupation="私塾先生"),
     VillagerSeed(npc_id="boy_shitou", name="小石头", kind="env", sector="education", occupation="学童"),

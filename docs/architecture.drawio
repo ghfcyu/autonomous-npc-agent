@@ -1,4 +1,4 @@
-<mxGraphModel dx="1600" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1640" pageHeight="1420" math="0" shadow="0">
+<mxGraphModel dx="1600" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1640" pageHeight="1480" math="0" shadow="0">
   <root>
     <mxCell id="0" />
     <mxCell id="1" parent="0" />
@@ -110,14 +110,14 @@
       <mxGeometry x="650" y="1030" width="820" height="45" as="geometry" />
     </mxCell>
 
-    <mxCell id="20" value="背景 NPC 层 BackgroundNPC（EventBus 订阅 · 零 LLM · 23 位环境 NPC）" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=13;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
+    <mxCell id="20" value="背景 NPC 层 BackgroundNPC（EventBus 订阅 · 零 LLM · 22 位环境 NPC）" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=13;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
       <mxGeometry x="60" y="1130" width="520" height="210" as="geometry" />
     </mxCell>
-    <mxCell id="21" value="BackgroundNPC&#10;EventBus 订阅者·不持有 LLM&#10;residence/schedule 作息驱动&#10;8 既有+15 新住民（T4-a）&#10;village_roster/ 15 份 JSON&#10;EnvMind 4D 注入+作息演化(T4-b)&#10;同 hour 判重 · clamp [0,1]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;fontSize=10" vertex="1" parent="1">
+    <mxCell id="21" value="BackgroundNPC&#10;EventBus 订阅者·不持有 LLM&#10;residence/schedule 作息驱动&#10;7 既有+15 新住民（T4-b 收尾）&#10;village_roster/ 15 份 JSON&#10;EnvMind 4D 注入+作息演化(T4-b)&#10;同 hour 判重 · 敌意边前缀(T4-c)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;fontSize=10" vertex="1" parent="1">
       <mxGeometry x="80" y="1175" width="220" height="110" as="geometry" />
     </mxCell>
-    <mxCell id="22" value="规则反应引擎&#10;事件类型+位置过滤&#10;模板轮转 → 格式化&#10;EnvMind 状态带→变体后缀&#10;(疲惫/愉悦·零 prompt)&#10;Tier 0/1 封印：不进 LLM" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;fontSize=10" vertex="1" parent="1">
-      <mxGeometry x="320" y="1175" width="230" height="110" as="geometry" />
+    <mxCell id="22" value="规则反应引擎&#10;事件类型+位置过滤&#10;模板轮转 → 格式化&#10;敌意前缀(T4-c)优先&#10;EnvMind 变体后缀·至多一条&#10;零 prompt·社会层优先&#10;Tier 0/1 封印：不进 LLM" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;fontSize=10" vertex="1" parent="1">
+      <mxGeometry x="320" y="1175" width="230" height="125" as="geometry" />
     </mxCell>
     <mxCell id="23" value="→ 发布 npc_action 事件回流 EventBus → 同地点核心 NPC 感知写入记忆 · 全程零 LLM / 零 token" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontColor=#666666" vertex="1" parent="1">
       <mxGeometry x="70" y="1298" width="500" height="30" as="geometry" />
@@ -221,6 +221,14 @@
         <Array as="points">
           <mxPoint x="30" y="1235" />
           <mxPoint x="30" y="225" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="66" value="敌意边注入（T4-c）· affinity&lt;0 → 反应文案敌意前缀（零 LLM）" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#b85450;fontSize=11;exitX=1;exitY=0.8;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0" edge="1" parent="1" source="12" target="20">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="1590" y="522" />
+          <mxPoint x="1590" y="1445" />
         </Array>
       </mxGeometry>
     </mxCell>

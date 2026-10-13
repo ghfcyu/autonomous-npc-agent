@@ -71,10 +71,15 @@ def main() -> int:
             return 1
 
     engine = NPCEngine(llm=provider)
+    # T4-b 收尾段（10-13）：新增第 3 核心 NPC tavern_sun 两用例——
+    # 新核心 NPC 的契约遵守率/延迟/失败率纳入常备冒烟口径
+    # （既有 chen/lily 三用例不动，chen prompt 跨迭代锚点口径保持可对照）
     cases = [
         ("chen", "你好，听说你是这条街上手艺最好的铁匠？"),
         ("chen", "帮我打一把剑，钱不是问题！"),
         ("lily", "老板娘，今天有什么新货吗？"),
+        ("tavern_sun", "孙掌柜，听说你年轻时跟镖队走过江湖？给我讲讲旧事"),
+        ("tavern_sun", "来一坛米酒，再切盘酱肉，今天想听点村里的新鲜事"),
     ]
 
     latencies = []          # 每用例延迟(ms)

@@ -11,9 +11,13 @@
   ① ``ENV_MIND_VARIANTS`` 状态带变体后缀拼进 npc_action 反应文案末尾
   （纯中文，优先级=元组序：p_fatigue/p_hunger/S_stress/e_P 各阈值
   0.65，每条反应至多一个后缀）；② ``apply_schedule(hour)`` 按作息状态
-  每小时演化一步（``MIND_EVOLUTION_RATES``：WORKING(+0.08,+0.06,+0.00,
-  +0.01) / IDLE(-0.05,-0.12,+0.02,-0.02) / SLEEPING(-0.15,-0.02,-0.03,
-  -0.05)，元组序=p_fatigue,p_hunger,e_P,S_stress，clamp [0,1]，同 hour
+  每小时演化一步（T4 收官修正后口径：三维单调步长 ``MIND_EVOLUTION_RATES``
+  WORKING(+0.08,+0.06,+0.01) / IDLE(-0.05,-0.12,-0.02) /
+  SLEEPING(-0.15,-0.02,-0.05)（元组序=p_fatigue,p_hunger,e_P,S_stress 中
+  除去 e_P 位；e_P 位为 None 哨兵——该维改走均衡收敛
+  ``E_P_EQUILIBRIUM_TARGETS``（WORKING 0.45/IDLE 0.68/SLEEPING 0.50）
+  × ``E_P_CONVERGENCE`` 0.5，每小时向段内目标收敛一半差距），
+  clamp [0,1]，同 hour
   多次调用只演化一步）；③ ``mind`` property（frozen，演化生成新实例）；
   ④ ``to_dict()`` 新增 ``env_mind`` 键（None 或 4D 两位小数 dict）；
 - 引擎默认构造 22 背景全员经 ``env_mind_for(config["id"])`` 注入；显式
@@ -29,6 +33,12 @@ apply_schedule(4..11) 为 8 个 WORKING 小时、每步各演化一次（任务�
 口径：初值上界 0.30 + 8×0.08 = 0.94 ≥ 0.65 必然抵达变体带——防纸面
 哲学：变体带必须在真实运转中可达）；防重用例恰用无表项的 hour 5，
 验证「同 hour 多次调用只演化一步」。
+
+T4 收官修正（审查指令 1，2026-10-14）：e_P 维从单调增量改为段内
+均衡收敛——运转期分布对账发现原 SLEEPING 段 -0.03/h 单调下移致
+17/22 低于生成带下界、多日运转全村情绪必向 0 塌陷，单调增量不可持续；
+本文件逐值断言同步更新为收敛语义（三维单调步长断言保留），新增
+IDLE 均衡位 0.68 → 变体带可达性锁定（连续闲适 3 小时 e_P≥0.65）。
 
 编写纪律（沿 test_village_integration.py）：
 - 不直接 import 可能未合入的新符号：模块级 getattr 软引用 +
@@ -89,10 +99,22 @@ _SKIP_NPC = ("T4-b 契约件未合入：BackgroundNPC 的 env_mind 构造参数 
 # EnvMind 4D 字段序（契约：MIND_EVOLUTION_RATES 元组序与此一致）
 ENV_MIND_FIELDS = ("p_fatigue", "p_hunger", "e_P", "S_stress")
 
-# 契约步长表（WORKING/IDLE/SLEEPING × 4D，元组序=p_fatigue,p_hunger,e_P,S_stress）
-WORKING_RATES = (0.08, 0.06, 0.00, 0.01)
-IDLE_RATES = (-0.05, -0.12, 0.02, -0.02)
-SLEEPING_RATES = (-0.15, -0.02, -0.03, -0.05)
+# 契约步长表（WORKING/IDLE/SLEEPING × 4D，元组序=p_fatigue,p_hunger,
+# e_P,S_stress；e_P 位=None 哨兵：该维走均衡收敛非步长，T4 收官修正）
+WORKING_RATES = (0.08, 0.06, None, 0.01)
+IDLE_RATES = (-0.05, -0.12, None, -0.02)
+SLEEPING_RATES = (-0.15, -0.02, None, -0.05)
+
+# e_P 均衡收敛契约（T4 收官修正，审查指令 1）：段内情绪均衡位
+# （劳作平淡 0.45/闲适带笑 0.68/睡眠归平 0.50）与收敛速率
+# （每小时向段内目标收敛一半差距）。
+E_P_TARGETS = {"WORKING": 0.45, "IDLE": 0.68, "SLEEPING": 0.50}
+E_P_CONVERGENCE = 0.5
+
+
+def converge_step(value, target):
+    """e_P 均衡收敛一步的契约期望值（clamp 后向段内目标收敛一半差距）。"""
+    return min(1.0, max(0.0, value + E_P_CONVERGENCE * (target - value)))
 
 # 四个状态带变体后缀的可感知锚词（契约文案逐字：哈欠/咕咕/眉头/笑意）
 SUFFIX_MARKS = ("哈欠", "咕咕", "眉头", "笑意")
@@ -328,31 +350,46 @@ class TestVariantFork(unittest.TestCase):
 # ========================================================================== #
 @unittest.skipUnless(NPC_READY, _SKIP_NPC)
 class TestMindEvolution(unittest.TestCase):
-    """apply_schedule 演化契约：状态延续语义下每小时按 MIND_EVOLUTION_RATES
-    步进 4D（WORKING/IDLE/SLEEPING 逐维差值），clamp [0,1] 不越界，同 hour
-    多次 tick 只演化一步，演化生成新实例不改旧引用。"""
+    """apply_schedule 演化契约（T4 收官修正后口径）：状态延续语义下
+    每小时演化一步——三维单调步长（p_fatigue/p_hunger/S_stress 按
+    MIND_EVOLUTION_RATES 逐维差值）+ e_P 均衡收敛（向 E_P_TARGETS 段内
+    目标收敛一半差距），clamp [0,1] 不越界，同 hour 多次 tick 只演化
+    一步，演化生成新实例不改旧引用。"""
 
     def test_working_hours_evolve_one_step_each(self):
         # 4..11 共 8 个 WORKING 小时（4 表项置 WORKING，5-11 状态延续），
-        # 每步 p_fatigue +0.08 / p_hunger +0.06 / e_P 不变 / S_stress +0.01
+        # 三维单调步进：p_fatigue +0.08 / p_hunger +0.06 / S_stress +0.01；
+        # e_P 位均衡收敛：每小时向 WORKING 均衡位 0.45 收敛一半差距
         npc = evolution_npc(EnvMind(0.30, 0.30, 0.50, 0.20))
         prev = mind_values(npc.mind)
         for hour in (4, 5, 6, 7, 8, 9, 10, 11):
             npc.apply_schedule(hour)
             cur = mind_values(npc.mind)
             for i, (field, delta) in enumerate(zip(ENV_MIND_FIELDS, WORKING_RATES)):
-                self.assertAlmostEqual(
-                    cur[i], prev[i] + delta, places=6,
-                    msg=f"hour={hour} {field} 应按 WORKING 步长 {delta:+.2f} 演化"
-                        f"（状态延续：无表项小时沿用 WORKING）")
+                if delta is None:
+                    # e_P 位：收敛公式逐值断言（元组 None 哨兵=非步长）
+                    self.assertAlmostEqual(
+                        cur[i], converge_step(prev[i], E_P_TARGETS["WORKING"]),
+                        places=6,
+                        msg=f"hour={hour} e_P 应向 WORKING 均衡位 0.45 收敛"
+                            f"一半差距（情绪归平语义，非单调步长）")
+                else:
+                    self.assertAlmostEqual(
+                        cur[i], prev[i] + delta, places=6,
+                        msg=f"hour={hour} {field} 应按 WORKING 步长 {delta:+.2f} 演化"
+                            f"（状态延续：无表项小时沿用 WORKING）")
             prev = cur
-        # 8 小时累计口径：初值 + 8×步长（0.30+0.64=0.94，未触 clamp）
+        # 8 小时累计口径：单调三维=初值+8×步长（0.30+0.64=0.94，未触 clamp）；
+        # e_P=均衡位+残余差距 0.45+(0.50-0.45)×0.5^8（向 0.45 指数收敛）
         self.assertAlmostEqual(npc.mind.p_fatigue, 0.30 + 8 * 0.08, places=6,
                                msg="8 个 WORKING 小时累计 p_fatigue 应=0.30+8×0.08")
         self.assertAlmostEqual(npc.mind.p_hunger, 0.30 + 8 * 0.06, places=6,
                                msg="8 个 WORKING 小时累计 p_hunger 应=0.30+8×0.06")
-        self.assertAlmostEqual(npc.mind.e_P, 0.50, places=6,
-                               msg="WORKING e_P 步长 +0.00：8 小时后应不变")
+        self.assertAlmostEqual(
+            npc.mind.e_P, E_P_TARGETS["WORKING"] + (0.50 - E_P_TARGETS["WORKING"]) * 0.5 ** 8,
+            places=6,
+            msg="WORKING e_P 均衡收敛：8 小时后应=0.45+(0.50-0.45)×0.5^8"
+                "（劳作平淡，情绪向均衡位归位而非漂移）")
         self.assertAlmostEqual(npc.mind.S_stress, 0.20 + 8 * 0.01, places=6,
                                msg="8 个 WORKING 小时累计 S_stress 应=0.20+8×0.01")
 
@@ -362,9 +399,17 @@ class TestMindEvolution(unittest.TestCase):
         npc.apply_schedule(12)  # herder_ma schedule "12": "IDLE"
         after = mind_values(npc.mind)
         for i, (field, delta) in enumerate(zip(ENV_MIND_FIELDS, IDLE_RATES)):
-            self.assertAlmostEqual(after[i], before[i] + delta, places=6,
-                                   msg=f"IDLE {field} 应按步长 {delta:+.2f} 演化"
-                                       f"（歇脚用餐恢复/闲适愉悦）")
+            if delta is None:
+                # e_P 位：收敛公式逐值断言（向闲适均衡位 0.68 收敛）
+                self.assertAlmostEqual(
+                    after[i], converge_step(before[i], E_P_TARGETS["IDLE"]),
+                    places=6,
+                    msg=f"IDLE e_P 应向均衡位 0.68 收敛一半差距"
+                        f"（闲适带笑，为变体带可达性留梯度）")
+            else:
+                self.assertAlmostEqual(after[i], before[i] + delta, places=6,
+                                       msg=f"IDLE {field} 应按步长 {delta:+.2f} 演化"
+                                           f"（歇脚用餐恢复/压力纾解）")
 
     def test_sleeping_hour_evolution_deltas(self):
         npc = evolution_npc(EnvMind(0.30, 0.30, 0.50, 0.20))
@@ -372,9 +417,18 @@ class TestMindEvolution(unittest.TestCase):
         npc.apply_schedule(19)  # herder_ma schedule "19": "SLEEPING"
         after = mind_values(npc.mind)
         for i, (field, delta) in enumerate(zip(ENV_MIND_FIELDS, SLEEPING_RATES)):
-            self.assertAlmostEqual(after[i], before[i] + delta, places=6,
-                                   msg=f"SLEEPING {field} 应按步长 {delta:+.2f} 演化"
-                                       f"（睡眠大恢复/情绪归平/压力释放）")
+            if delta is None:
+                # e_P 位：收敛公式逐值断言（本例初值恰在睡眠均衡位 0.50，归平不动）
+                self.assertAlmostEqual(
+                    after[i], converge_step(before[i], E_P_TARGETS["SLEEPING"]),
+                    places=6,
+                    msg="SLEEPING e_P 应向均衡位 0.50 收敛（情绪归平语义；"
+                        "本例初值恰在均衡位，单步不动——睡眠不再单调压情绪，"
+                        "修正多日运转向 0 塌陷的机制缺陷）")
+            else:
+                self.assertAlmostEqual(after[i], before[i] + delta, places=6,
+                                       msg=f"SLEEPING {field} 应按步长 {delta:+.2f} 演化"
+                                           f"（睡眠大恢复/压力释放）")
 
     def test_working_clamps_at_upper_bound(self):
         # 0.95 + 2×0.08 = 1.11 → clamp 1.0（WORKING 两小时不越上界）
@@ -482,6 +536,35 @@ class TestRuntimeVisibility(unittest.TestCase):
             drop, 0.15,
             msg=f"中午 IDLE 歇晌后 p_fatigue 应比峰值回落 ≥ 0.15（实际回落 "
                 f"{drop:.4f}——歇过晌午缓过来，变体消失的叙事对偶）")
+
+    def test_three_idle_hours_reach_joy_variant_band(self):
+        # T4 收官修正设计约束锁定：IDLE 均衡位 0.68 保证 e_P 变体带
+        # （ENV_MIND_VARIANTS 阈值 0.65）连续闲适约 3 小时后可达——从
+        # WORKING 均衡位 0.45 出发 0.68-0.23×0.5^t ≥ 0.65 → t ≥ 2.9，
+        # 收敛机制不丢失玩家可感知的行为出口（防纸面哲学）。
+        # 受控输入：e_P 取 WORKING 均衡位 0.45（长时段劳作后的最劣起点，
+        # 比生成带下界 0.40 更保守——0.40 起点同样 3 小时抵达 0.645+
+        # clamp 后逐级逼近，4 小时必过带）；herder_ma 12 表项 IDLE、
+        # 13/14 无表项状态延续 → 连续 3 小时闲适。
+        config = herder_ma_config()
+        world, npc = stage_env_event_npc(
+            config, EnvMind(0.30, 0.30, 0.45, 0.20), "pasture")
+        for hour in (12, 13, 14):
+            npc.apply_schedule(hour)
+        self.assertGreaterEqual(
+            npc.mind.e_P, 0.65,
+            msg=f"连续 IDLE 3 小时后 e_P={npc.mind.e_P:.4f} 应 ≥ 0.65"
+                f"（从 WORKING 均衡位 0.45 出发：0.68-0.23×0.5^3=0.65125——"
+                f"闲适三小时嘴角带笑，玩家可感知的行为出口不因均衡收敛丢失）")
+        # 端到端可感知：此刻发布一次同地 env_event，其余三维均在平稳带
+        # （疲劳 0.15/饥饿 clamp 0.0/压力 0.14），反应文案应可见『笑意』
+        world.accumulate_event_slot(1.0)
+        summaries = only_reaction_summaries(world, npc.id)
+        self.assertEqual(len(summaries), 1,
+                         msg="同地 env_event 应恰触发 herder_ma 一次规则反应")
+        self.assertIn("笑意", summaries[0],
+                      msg="连续闲适 3 小时的高愉悦状态带下，herder_ma 的反应"
+                          "文案应端到端可见『笑意』（e_P 变体带真实可达）")
 
 
 # ========================================================================== #

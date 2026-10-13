@@ -9,6 +9,13 @@ T4-c 敌意边行为出口（2026-10-13）：可选注入关系网，事件 acto
 敌意边（self→actor 且 affinity<0）时反应文案前拼敌意前缀——社会
 层前缀优先于 EnvMind 生理层后缀（同时命中只取前缀，至多一条纪律），
 纯文案拼接零 LLM 零 prompt。
+
+T4 收官修正（审查指令 1，运转期分布对账）：e_P 维从「单调增量」改为
+「向段内均衡目标收敛」（E_P_EQUILIBRIUM_TARGETS + E_P_CONVERGENCE）。
+对账依据：原 SLEEPING 段 e_P -0.03/h 单调下移致每日净变化约 -0.16，
+多日运转全村 e_P 必向 0 塌陷（17/22 低于生成带下界），与「情绪归平」
+注释语义及持续运转的活村庄目标相悖；收敛语义下情绪向段内均衡位
+回归而非无限漂移。三维单调步长（生理/压力）与 clamp [0,1] 不变。
 """
 from __future__ import annotations
 from dataclasses import replace
@@ -25,17 +32,38 @@ ENV_MIND_VARIANTS: tuple[tuple[str, float, str], ...] = (
     ("S_stress", 0.65, "，眉头微微拧着"),
     ("e_P", 0.65, "，嘴角带着笑意"),
 )
-# 每小时 4D 演化步长（作息段内每小时演化，无表项小时沿用当前作息
-# 状态；元组序 = EnvMind 字段序
-# p_fatigue/p_hunger/e_P/S_stress）。叙事依据：
-# WORKING 劳作累积疲劳/体力消耗/无暇他顾/压力微增；
-# IDLE 歇脚用餐恢复/闲适愉悦；SLEEPING 睡眠大恢复/情绪归平/压力释放。
+# 每小时 4D 演化（作息段内每小时演化，无表项小时沿用当前作息状态；
+# 元组序 = EnvMind 字段序 p_fatigue/p_hunger/e_P/S_stress）。
+# 三维单调步长（生理/压力）叙事依据：
+# WORKING 劳作累积疲劳/体力消耗/压力微增；
+# IDLE 歇脚用餐恢复/压力纾解；SLEEPING 睡眠大恢复/压力释放。
 # 日平衡为负（一觉睡回低位），白天劳作后午后疲劳抵达 0.65+ 触发变体带。
+# e_P 位为 None 哨兵：该维不走单调步长（防误读为步长），改走均衡
+# 收敛（情绪归平语义，见 E_P_EQUILIBRIUM_TARGETS）——修正依据：
+# 运转期对账发现原 SLEEPING 段 -0.03/h 单调下移使每日净变化约
+# -0.16、17/22 低于生成带下界，多日运转全村情绪必向 0 塌陷，
+# 单调下移不可持续（T4 收官，审查指令 1）。
 MIND_EVOLUTION_RATES: dict = {
-    "WORKING":  (0.08, 0.06, 0.00, 0.01),
-    "IDLE":     (-0.05, -0.12, 0.02, -0.02),
-    "SLEEPING": (-0.15, -0.02, -0.03, -0.05),
+    "WORKING":  (0.08, 0.06, None, 0.01),
+    "IDLE":     (-0.05, -0.12, None, -0.02),
+    "SLEEPING": (-0.15, -0.02, None, -0.05),
 }
+
+# T4 收官修正：e_P 段内均衡收敛目标（情绪归平语义——不同作息段的
+# 情绪均衡位：劳作平淡 0.45 / 闲适带笑 0.68 / 睡眠归平 0.50）。
+# 设计约束：IDLE 目标 0.68 保证 e_P 变体带（ENV_MIND_VARIANTS 阈值
+# 0.65）在连续闲适约 3 小时后可达——从 WORKING 均衡位 0.45 出发
+# 0.68-0.23×0.5^t ≥ 0.65 → t ≥ 2.9，玩家可感知的行为出口不因收敛
+# 机制丢失（tests/test_env_mind_behavior.py TestRuntimeVisibility
+# test_three_idle_hours_reach_joy_variant_band 锁定该可达性）。
+E_P_EQUILIBRIUM_TARGETS: dict = {
+    "WORKING": 0.45,
+    "IDLE": 0.68,
+    "SLEEPING": 0.50,
+}
+
+# e_P 收敛速率：每小时向段内均衡目标收敛一半差距。
+E_P_CONVERGENCE = 0.5
 
 # T4-c 敌意边行为出口：事件 actor 命中敌意边（self→actor 且
 # affinity<0）时拼接在反应文案前的前缀池。文案克制（每条括注
@@ -266,18 +294,26 @@ class BackgroundNPC:
     def _evolve_mind(self, hour: int, state_str: str) -> None:
         """EnvMind 按作息状态演化一步（frozen dataclass 经 replace 整体替换）。
 
-        rates 无匹配（未知作息状态）不演化；步长与叙事依据见
-        MIND_EVOLUTION_RATES；每维 clamp 到 [0.0, 1.0]（与 InnerState
-        apply_delta 同值域语义）。调用方 apply_schedule 负责同 hour 判重。
+        rates 无匹配（未知作息状态）不演化（外层判重逻辑不变）；三维
+        （p_fatigue/p_hunger/S_stress）按 MIND_EVOLUTION_RATES 单调步进，
+        e_P 维按均衡收敛——每小时向 E_P_EQUILIBRIUM_TARGETS 段内目标
+        收敛一半差距（元组 e_P 位 None 哨兵=该维走收敛，非步长；目标
+        表缺该状态时 e_P 不动，防新增作息段漏配目标位静默漂移）；每维
+        clamp 到 [0.0, 1.0]（与 InnerState apply_delta 同值域语义）。
+        调用方 apply_schedule 负责同 hour 判重。
         """
         rates = MIND_EVOLUTION_RATES.get(state_str)
         if rates is None:
             return
+        e_P = self._mind.e_P
+        e_P_target = E_P_EQUILIBRIUM_TARGETS.get(state_str)
+        if e_P_target is not None:
+            e_P = min(1.0, max(0.0, e_P + E_P_CONVERGENCE * (e_P_target - e_P)))
         self._mind = replace(
             self._mind,
             p_fatigue=min(1.0, max(0.0, self._mind.p_fatigue + rates[0])),
             p_hunger=min(1.0, max(0.0, self._mind.p_hunger + rates[1])),
-            e_P=min(1.0, max(0.0, self._mind.e_P + rates[2])),
+            e_P=e_P,
             S_stress=min(1.0, max(0.0, self._mind.S_stress + rates[3])),
         )
 

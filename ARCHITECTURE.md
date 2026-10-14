@@ -366,6 +366,37 @@ NPCEngine.tick(minutes)
 - **第一小步已落地（2026-10-11）**：`engine/village_genesis.py` 离线人口学生成器——25 人齐普夫职业阶层花名册（farming 7 / craft 5 / 特殊职业各 ≤2）+ `generate_village()` 确定性人口学档案（crc32(npc_id) 种子）；关键 NPC 2 人（chen/lily，mind=None，8D 全量由运行时 InnerState 承载）vs 环境 NPC 23 人（`EnvMind` 4D 压缩稳态：p_fatigue/p_hunger/e_P/S_stress 字段名与 8D 严格同名——共线性纪律，常人平稳带初值，Tier 0/1 封印不进任何 prompt）；**单一挂载内核纪律**：原 `NPCEngine._build_tag_ledger` 主体提取为 `tag_mount.build_genesis_ledger`（engine 薄壳委托、签名行为零变化），引擎常驻化 / mount_tags 显式 API / village_genesis 三方复用同一函数（chen 缺陷/把柄挂载双源全等有测试锁）；15 位新住民配置落位 `configs/village_roster/`（共居消化居所增速：赵宅 3 口/药童寄宿秦家/帮工寄宿孙家/学童寄宿私塾宅；更夫 20:00-03:00 夜班作息反转、牧人 04:00 早出），生产路径暂不自动加载——待 T4-a 地点扩容（17→33，NEW_LOCATION_IDS 14 个引用清单）后正式接入运转；正态/齐普夫/金字塔三形状分布断言+环境零 LLM 双口径见 `tests/test_village_genesis.py`（40 用例）；生成器为纯离线数据层，token 基线 4501 零影响
 - **第二小步（T4-a）已落地（2026-10-11 22:00）**：地点 17→**33** 四类扩容——`work` 作业场所新类别 5 处（pasture 牧场/farm 农田/river 河畔/mill 磨坊/carpentry 木匠铺，修复"农夫在广场、渔夫在井边工作"叙事缺陷：farmer_zhao→farm、fisher_zhou→river）+ public 扩至 4（school 私塾/shrine 祠堂）+ residence 扩至 19（9 新居所共居环带，实际唯一居所 19 与提案预估 21 的偏差源：长工住东家 farmhand_sun→house_zhao、帮工住老板家 tavern_aman→house_sun 的额外共居消化，更真实的村落设定）；**15 新住民正式接入运转**：`NPCEngine` 生产/演示路径自动 `load_newcomer_configs()`（复用 village_genesis 单一来源，共 23 背景 NPC），白天农田/河畔/牧场各有其人、21:00 更夫巡村+赵家四口归宅、03:00 更夫收工回家的昼夜分布图成形；**事件池 46 条 25/25 全员覆盖**（15 新住民每人 2 条职业生活文案，尾部追加保轮播首项不变）；**两项 T4-a token 裁剪**：①【周围的人】nearby 按 viewer 亲缘度 |affinity| 降序稳定排序取前 5（`decision.py NEARBY_PROMPT_LIMIT`）——25 NPC 同地点密度护栏；②【人际关系】top-3 截断+类型权重保底（`relationships.py _PRIORITY_RELATION_TYPES`：父子/师徒不因 |affinity| 低被挤出，低好感父亲依然是父亲）；快脑商品词品类后缀边界收紧（`fast_brain.py _GOODS_SUFFIX_CHARS`：「铁剑鞘」不得提取"铁剑"答非所问）；token 基线 4501→4523（运转噪声合法波动 +22，容忍带内，PINNED 同步）；接入运转验收见 `tests/test_village_integration.py`（12 测试类 30 用例：规模/工作地映射/共居/夜班/全天运转/零 LLM 双口径/事件池覆盖/两项裁剪/商品边界/新地点问路）；架构图已同步重画（village_genesis 创生层+接入箭头入图，视觉 QA 8 项全 PASS）；**T4-b 两小步已落地（2026-10-12）**：第一小步关系网 8→44 全员覆盖（见 2.7 节），第二小步 EnvMind 行为消费出口（见 2.8 节，延续语义下变体带真实可达：基线场景 11/22 NPC 日内抵达 0.65+ 带、全天 6 条 npc_action 带后缀，均未进入对话时刻核心 NPC 最近经历窗口，token 基线 4519 零影响）；**T4-b 收尾段已落地（2026-10-13 22:00）**：tavern_sun 升级第 3 核心 NPC（配置 `configs/npcs/tavern_sun.json`，cheerful 复用掩码+genesis 标签账本常驻化+快脑经营范围米酒/酱肉，记忆/8D 心智/快慢脑/LLM 对话全套；分层 2+23→3+22，token 基线 4519 零变化——其旧背景规则反应事件本就不进核心对话记忆窗口，实测三次严格相等）+ **T4-c 敌意边行为出口**（见 2.8 节：背景反应文案层消费敌意关系边，社会层前缀优先于 EnvMind 生理层后缀，T6 把柄勒索的反应层基础设施）；验收见 `tests/test_tavern_core_npc.py`（9 用例）+ `tests/test_hostile_edge_behavior.py`（8 用例）；余项：分布形状运转期验证
 
+### 行为经济学层 v2：杜希格习惯回路离散截断（T5，第一小步已落地）
+
+> v2 蓝图"行为经济学离散事件化"三件套（EWMA 财富基准 / 禀赋效应 / 损失域豪赌）中的 0-token 基础设施先行批：杜希格《习惯的力量》三段回路（线索→惯例→奖赏）在背景 NPC 层的离散截断实现。`engine/habit.py` `HabitLoop`（2026-10-14 落地），黄昏线索→酒馆聚集，纯规则 Tier 0/1 封印层。
+
+```
+社会关系边（configs/relationships.json，44 条既有边，零新增配置）
+    │  HabitLoop 构造时遍历一次：与 tavern_sun 任一方向的
+    │  "酒友/老主顾"边（PUB_RELATION_TYPES 精确匹配）→ 习惯 id 集合
+    ▼
+NPCEngine.tick() 背景 NPC apply_schedule 循环之后
+    │  HabitLoop.apply(world.hour)，四层闸门全过才行动：
+    │  ① 黄昏窗口 hour ∈ DUSK_HOURS={17,18}（杜希格"线索"）
+    │  ② 同 hour 判重（至多一条习惯 npc_action，沿 _last_react_hour 模式）
+    │  ③ 状态 IDLE（BackgroundNPC.state_str 只读 property；作息未应用
+    │     None 保守不行动；WORKING/SLEEPING 打烊时段不扰）
+    │  ④ 位置 ≠ tavern（已在地不重复触发）
+    ▼
+world.move_entity(npc_id, "tavern") + npc_action 确定性中文文案
+    （HABIT_TEMPLATES 3 条按触发计数取模轮转，与反应模板轮换同构；
+     杜希格"惯例"=移步酒馆，"奖赏"=文案即叙事层"喝一杯"的玩家可感知投影）
+    ▼
+熄灯交接（非 HabitLoop 职责）：19/20/21 点各 NPC apply_schedule
+    SLEEPING 状态变化自然移居所——既有 G6-B 作息移动接管，
+    习惯层只"拉人进酒馆"，熄灯交给作息层
+```
+
+- **离散截断设计**：线索=时钟离散窗口 `hour∈{17,18}`（黄昏）；惯例=移步酒馆+确定性文案；奖赏=叙事层"喝一杯"（文案本身即奖赏的玩家可感知投影）——**连续奖赏函数/渴望强度曲线按纸面哲学砍除**（三段回路全部可在纯规则层离散表达，无需数值化）。习惯推导口径：社会关系→习惯的数据流（常客黄昏自然要去喝一杯的叙事依据），默认村庄命中恰三人 guard_wang（酒友）/fisher_zhou（老主顾）/doc_qin（老主顾），17-18 点三人恰处 IDLE 段；herder_ma→tavern_sun 的"主顾"为近义类型不命中（精确匹配收紧常客语义）
+- **token 成本账**：纯规则 0-token——`HabitLoop` 与 EnvMind 同属 Tier 0/1 封印层（不持有任何 LLM 引用、不组装任何 prompt、习惯状态不进任何 LLM 上下文，行为出口仅为位移+npc_action 确定性中文文案）；背景 NPC 决策链零触碰；token 基线 4519 不变（习惯事件未进入 chen/lily 对话时刻记忆窗口，与 tavern_sun 升级时同口径实测）
+- **后续小步展望**（每项一行）：EWMA 财富基准（参考点依赖的得失感知）；2.5 倍禀赋效应（对已持有物品的估价放大）；损失域豪赌（亏损状态下的风险偏好反转）
+- **验收标准**（玩家可感知）：黄昏时点走进酒馆场景可见常客聚集（三常客+老板+帮工同场）且习惯文案可见（"（收了工，秦大夫熟门熟路拐进酒馆）"类）；`relationships=None` 零习惯零行为向后兼容；零 LLM 双口径；验收见 `tests/test_habit.py`（4 测试类 19 用例：习惯推导分叉/四层触发闸门/文案轮转/17 点聚集端到端/熄灯交接/非黄昏不动/同 hour 判重/零 LLM/空网兼容）
+
 ### 架构图重画硬清单（T3 执行，2026-10-07 固化；2026-10-10 22:00 已重画完成）
 
 > 审查指令（10-06 第六次审查指令 3 + 10-09 第九次指令 3）要求：`docs/architecture.png` 重画必须覆盖以下组件，缺项判文档失同步。

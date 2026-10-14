@@ -5,10 +5,12 @@ T4-b 第二小步（2026-10-12）：可选持有 4D 压缩稳态 EnvMind（Tier 
 反应文案按状态带拼接纯中文变体后缀，并随作息 tick 每小时离散演化
 （无表项小时沿用当前作息状态，状态延续语义）。
 
-T4-c 敌意边行为出口（2026-10-13）：可选注入关系网，事件 actor 命中
-敌意边（self→actor 且 affinity<0）时反应文案前拼敌意前缀——社会
-层前缀优先于 EnvMind 生理层后缀（同时命中只取前缀，至多一条纪律），
-纯文案拼接零 LLM 零 prompt。
+T4-c 敌意边行为出口（2026-10-13）→ 社会关系反应出口统一收口（审查
+指令 2，3/3 完整闭环）：可选注入关系网，事件 actor 命中 self→actor
+关系边时按三类型分派反应文案前缀——敌意（affinity<0，优先判定）/
+师徒（师父=恭敬池、徒弟=长辈慈和池）/血缘（父亲/母亲/儿子/女儿/
+妻子/丈夫=亲昵池）；社会层前缀优先于 EnvMind 生理层后缀（同时命中
+只取前缀，至多一条纪律——文案克制），纯文案拼接零 LLM 零 prompt。
 
 T4 收官修正（审查指令 1，运转期分布对账）：e_P 维从「单调增量」改为
 「向段内均衡目标收敛」（E_P_EQUILIBRIUM_TARGETS + E_P_CONVERGENCE）。
@@ -65,16 +67,42 @@ E_P_EQUILIBRIUM_TARGETS: dict = {
 # e_P 收敛速率：每小时向段内均衡目标收敛一半差距。
 E_P_CONVERGENCE = 0.5
 
-# T4-c 敌意边行为出口：事件 actor 命中敌意边（self→actor 且
-# affinity<0）时拼接在反应文案前的前缀池。文案克制（每条括注
-# ≤6 字）；确定性轮转与模板轮换同构（同一 _reaction_counter
-# 计数取模）。社会层前缀优先于 EnvMind 生理层后缀（同时命中
-# 只取前缀不叠加，至多一条纪律）。
+# T4-c 社会关系反应出口（审查指令 2 收口 3/3）：事件 actor 命中
+# self→actor 关系边时拼接在反应文案前的前缀池（三类型统一出口）。
+# 文案克制（每条括注 ≤6 字）；确定性轮转与模板轮换同构（同一
+# _reaction_counter 计数取模）。社会层前缀优先于 EnvMind 生理层
+# 后缀（同时命中只取前缀不叠加，至多一条纪律）。
 HOSTILE_PREFIXES: tuple[str, ...] = (
     "（冷哼一声）",
     "（把脸别过去）",
     "（头也不抬）",
 )
+
+# 师徒边：relation == "师父"（actor 是我的师父）→ 恭敬池。
+MASTER_PREFIXES: tuple[str, ...] = (
+    "（躬身）",
+    "（拱手行礼）",
+)
+
+# 师徒边：relation == "徒弟"（actor 是我的徒弟）→ 长辈慈和池。
+ELDER_PREFIXES: tuple[str, ...] = (
+    "（颔首）",
+    "（含笑打量）",
+)
+
+# 血缘边：relation ∈ 父亲/母亲/儿子/女儿/妻子/丈夫 → 亲昵池。
+# 行为出口子集（六类直系）：比 relationships._PRIORITY_RELATION_TYPES
+# 窄（不含兄长/兄弟/师娘等旁系与变体写法）——旁系亲昵度叙事上弱于
+# 直系，且 configs/relationships.json 现有血缘边全部落在该六类内。
+KIN_PREFIXES: tuple[str, ...] = (
+    "（笑着招手）",
+    "（快步迎上前）",
+)
+
+# 血缘亲昵池的 relation 类型集合（分派查表用，见 KIN_PREFIXES 注）。
+_KIN_RELATION_TYPES = frozenset({
+    "父亲", "母亲", "儿子", "女儿", "妻子", "丈夫",
+})
 
 
 class BackgroundNPC:
@@ -90,10 +118,12 @@ class BackgroundNPC:
       每小时演化（无表项小时沿用当前作息状态）——纯 Tier 0/1 规则计算，零 LLM 零 prompt（封印语义：
       EnvMind 数值与英文字段名不进任何 LLM prompt，行为出口仅为
       npc_action 文案变体）
-    - T4-c 敌意边行为出口：可选注入关系网（relationships=None 时
-      行为与旧版完全一致），事件 actor 命中敌意边（self→actor 且
-      affinity<0）时反应文案前拼敌意前缀——社会层优先于 EnvMind
-      生理层后缀，同时命中只取前缀不叠加（至多一条纪律）
+    - T4-c 社会关系反应出口（审查指令 2 收口 3/3）：可选注入关系网
+      （relationships=None 时行为与旧版完全一致），事件 actor 命中
+      self→actor 关系边时按三类型分派反应文案前缀——敌意
+      （affinity<0）/师父（恭敬池）/徒弟（长辈慈和池）/血缘（亲昵
+      池），中性类型不前拼；社会层前缀优先于 EnvMind 生理层后缀，
+      同时命中至多一条（文案克制纪律）
     - 反应同 hour 判重（第十二次审查落地）：判重键 (hour, event.kind)——
       同一小时内对同一事件类型至多发布一条 npc_action（位置过滤通过
       才计配额，跨 hour 自动恢复），hour 口径与 EnvMind 演化层
@@ -122,8 +152,9 @@ class BackgroundNPC:
         # 多次 tick 判重（10 分钟粒度一天 144 次 tick 只演化一步）。
         self._mind: Optional[EnvMind] = env_mind
         self._last_evolved_hour: Optional[int] = None
-        # T4-c 敌意边行为出口：关系网引用（None 时敌意检查恒空串，
-        # 行为与旧版完全一致）；仅文案层消费，零 LLM 零 prompt 注入。
+        # T4-c 社会关系反应出口：关系网引用（None 时社会前缀分派恒
+        # 空串，行为与旧版完全一致）；仅文案层消费，零 LLM 零 prompt
+        # 注入。
         self._relationships = relationships
 
         # 注册实体到世界
@@ -170,6 +201,15 @@ class BackgroundNPC:
     def mind(self) -> Optional[EnvMind]:
         """4D 压缩稳态 EnvMind（未注入时为 None；纯数据观测出口，不进 prompt）。"""
         return self._mind
+
+    @property
+    def state_str(self) -> Optional[str]:
+        """当前作息状态字符串（WORKING/IDLE/SLEEPING；作息未应用时 None）。
+
+        只读观测出口，供习惯回路（engine/habit.py）等纯规则层消费
+        （零 LLM 零 prompt，Tier 0/1 封印不破）。
+        """
+        return self._current_state
 
     def apply_schedule(self, hour: int) -> Optional[str]:
         """作息驱动：按 tick 时间在居所/工作地间移动。
@@ -237,13 +277,13 @@ class BackgroundNPC:
         self._reaction_counter[event.kind] = counter + 1
         # 格式化反应文本并发布
         text = self._format_reaction(template, event)
-        # T4-c 敌意边前缀（社会层）优先于 EnvMind 变体后缀（生理层）：
-        # 同时命中只取敌意前缀、不叠加后缀（至多一条纪律）；无敌意
-        # 命中时 EnvMind 路径与旧版完全一致。文案层位于判重之后、
-        # 发布之前，不改变判重行为。
-        hostile = self._hostile_prefix(event.actor, counter)
-        if hostile:
-            text = hostile + text
+        # T4-c 社会关系边前缀（敌意/师徒/血缘三类型统一出口，社会层）
+        # 优先于 EnvMind 变体后缀（生理层）：同时命中只取社会前缀、
+        # 不叠加后缀（至多一条纪律）；无社会边命中时 EnvMind 路径与
+        # 旧版完全一致。文案层位于判重之后、发布之前，不改变判重行为。
+        social = self._social_prefix(event.actor, counter)
+        if social:
+            text = social + text
         else:
             # T4-b 第二小步：按 EnvMind 状态带拼接纯中文变体后缀（零 LLM）。
             text += self._variant_suffix()
@@ -261,20 +301,43 @@ class BackgroundNPC:
         except (KeyError, IndexError, ValueError):
             return template.replace("{npc_name}", self._name)
 
-    def _hostile_prefix(self, actor: str, counter: int) -> str:
-        """敌意关系边变体前缀（纯中文文案拼接，零 LLM 零 prompt）。
+    def _social_prefix(self, actor: str, counter: int) -> str:
+        """社会关系边变体前缀（血缘/师徒/敌意三类型统一出口，纯中文
+        文案拼接，零 LLM 零 prompt）。
 
-        关系网未注入（None）、actor 为空/为玩家、或 self→actor 无敌意
-        边（get_relation_to 未命中或 affinity≥0）时返回空串——文案
-        路径与旧版完全一致。命中时按本次反应的既有触发计数取模
-        确定性轮转前缀（与模板轮换同构：同一计数器同一取模机制）。
+        设计依据（T4-c 审查指令 2，3/3 完整闭环）：社会层前缀优先于
+        生理层（EnvMind）后缀，同时命中至多一条（文案克制纪律）——
+        由调用处保证：本方法返回非空前缀时不再拼接 EnvMind 变体后缀。
+
+        关系网未注入（None）、actor 为空/为玩家、或 self→actor 无关系
+        边（get_relation_to 未命中）或关系为中性类型（既非血缘亦非
+        师徒亦非敌意）时返回空串——文案路径与旧版完全一致。命中时按
+        本次反应的既有触发计数取模确定性轮转前缀（与模板轮换同构：
+        同一计数器同一取模机制）。
+
+        分派优先级（一条 get_relation_to 只返回一条边，天然至多命中
+        一类；敌意判定放最前——affinity<0 优先于类型判定，防未来
+        数据出现「血缘+负值」时误入亲昵池）：
+        - affinity < 0          → 敌意池 HOSTILE_PREFIXES；
+        - relation == "师父"     → 恭敬池 MASTER_PREFIXES；
+        - relation == "徒弟"     → 长辈慈和池 ELDER_PREFIXES；
+        - relation ∈ _KIN_RELATION_TYPES → 血缘亲昵池 KIN_PREFIXES；
+        - 其余中性类型          → 空串（与旧版行为一致）。
         """
         if self._relationships is None or not actor or actor == "player":
             return ""
         rel = self._relationships.get_relation_to(self._id, actor)
-        if rel is None or rel.affinity >= 0:
+        if rel is None:
             return ""
-        return HOSTILE_PREFIXES[counter % len(HOSTILE_PREFIXES)]
+        if rel.affinity < 0:
+            return HOSTILE_PREFIXES[counter % len(HOSTILE_PREFIXES)]
+        if rel.relation == "师父":
+            return MASTER_PREFIXES[counter % len(MASTER_PREFIXES)]
+        if rel.relation == "徒弟":
+            return ELDER_PREFIXES[counter % len(ELDER_PREFIXES)]
+        if rel.relation in _KIN_RELATION_TYPES:
+            return KIN_PREFIXES[counter % len(KIN_PREFIXES)]
+        return ""
 
     def _variant_suffix(self) -> str:
         """EnvMind 状态带变体后缀（纯中文文案拼接，零 LLM 零 prompt）。

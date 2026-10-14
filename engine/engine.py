@@ -14,6 +14,7 @@ import random
 from typing import Any, Dict, List, Optional
 
 from .background_npc import BackgroundNPC
+from .habit import HabitLoop
 from .llm import create_provider
 from .llm.base import BaseLLMProvider
 from .npc import NPC, Persona
@@ -83,6 +84,11 @@ class NPCEngine:
             bg = BackgroundNPC(config, self.world, env_mind=env_mind_for(config["id"]),
                                relationships=self.relationships)
             self.background_npcs[bg.id] = bg
+        # T5 第一小步：黄昏酒馆习惯回路（杜希格习惯回路离散截断，纯规则
+        # 0-token，背景 NPC 范围；relationships 空网/None 时习惯集合为空、
+        # 行为与无 HabitLoop 等价，向后兼容）
+        self._habit_loop = HabitLoop(self.world, self.background_npcs,
+                                     self.relationships)
 
     @staticmethod
     def _load_bg_configs(config_dir: str = DEFAULT_BG_CONFIG_DIR) -> List[dict]:
@@ -257,6 +263,9 @@ class NPCEngine:
             state = bg.apply_schedule(self.world.hour)
             if state is not None:
                 applied[bg_id] = state
+        # T5 第一小步：黄昏酒馆习惯回路（在作息状态落地后消费 IDLE 段；
+        # 熄灯不归位——19/20/21 点由各 NPC SLEEPING 作息移动接管）
+        self._habit_loop.apply(self.world.hour)
         return {"clock": self.world.clock, "tick": self.world.tick_count,
                 "schedule_applied": applied}
 

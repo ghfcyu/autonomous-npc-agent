@@ -12,13 +12,16 @@
 6. StateUpdater · time_passed：疲劳随时间变化（睡觉恢复、清醒累积）
 7. StateUpdater · npc_action：行动消耗疲劳
 8. NPCEngine.player_gives 防御：G1 遗留修复——给玩家送礼被拒
-9. <35token 红线预防：【此刻内心】行无浮点、标签 ≤4、全常带单标签
+9. <35token 红线预防：【此刻内心】行无浮点、8D 标签 ≤4 + 财富标签 ≤1
+   （T5 第二小步扩展口径，见 TestPromptTokenRedline 口径变更史）、
+   全常带单标签
 """
 
 import re
 import unittest
 
 from engine.actions import ActionType
+from engine.economics import GAIN_TAG
 from engine.engine import NPCEngine
 from engine.inner_state import InnerState
 from engine.llm.mock import MockLLMProvider
@@ -351,6 +354,19 @@ class TestPromptTokenRedline(unittest.TestCase):
 
     (a) 显著状态下【此刻内心】行无浮点（正则 \\d\\.\\d 零匹配）；
     (b) 离散标签数 ≤4（7 带全命中也截断）；
+        口径变更史（书面记录）：
+        - 原口径（T1 8D 状态带离散化，2026-10-10）：【此刻内心】行
+          标签数 ≤4——标签源唯一（8D 离散标签），无财富标签；
+        - 新口径（T5 第二小步，EWMA 财富基准落地，2026-10-15 测试侧
+          记录）：决策链新增财富显著带标签源（engine/economics.py
+          WealthLedger.fortune_tag → decision.py _user_prompt fortune
+          参数，非空时替换"心境平稳"后追加行尾），口径扩展为
+          **8D 标签 ≤4 + 财富标签 ≤1**，最坏拼接行（前缀+4 标签+
+          顿号+7 字财富标签+换行 = 34 字符）≤36 字符，仍守 <35token
+          红线；
+        - 变更原因：T5 第二小步新增财富标签源属功能变更，"标签数
+          ≤4"口径随之合法扩展（本类旧断言 (b) 逐字保留仍成立——
+          fortune 缺省空时行内恒 ≤4；扩展断言见新增用例）；
     (c) 全常带时行内含"心境平稳"且无其他标签。
     """
 
@@ -390,6 +406,45 @@ class TestPromptTokenRedline(unittest.TestCase):
         line = self._inner_line()
         self.assertIn("心境平稳", line)
         self.assertEqual(line.split("、"), ["心境平稳"])
+
+    def test_redline_fortune_extension_worst_case(self):
+        """(b-扩展，T5 第二小步) 8D 标签 ≤4 + 财富标签 ≤1：7 带全命中
+        叠加财富显著带，行内 8D 标签 ≤4、财富标签恰 1 个且拼接在行尾
+        （"心境平稳"不存在于显著态行内），最坏拼接行（含【此刻内心】
+        前缀与换行）字符数 ≤36——<35token 红线的最坏情形封顶断言。
+
+        口径变更史见本类 docstring：原口径"标签数 ≤4"→ 新口径
+        "8D 标签 ≤4 + 财富标签 ≤1"；变更原因 = T5 第二小步新增
+        财富标签源（功能变更唯一许可的口径扩展）。"""
+        npc, world, _ = _make_npc()
+        for key in ("S_stress", "e_A", "e_P", "e_D",
+                    "p_fatigue", "p_hunger", "p_pain"):
+            setattr(npc.inner_state, key, 0.95)
+        memory_ctx = npc.memory.context_for("你好")
+        snapshot = world.snapshot("chen")
+        prompt = npc.decision._user_prompt(
+            "你好", world, memory_ctx, snapshot, npc.inner_state,
+            fortune=GAIN_TAG)
+        match = re.search(r"【此刻内心】(.+)\n", prompt)
+        assert match is not None, "【此刻内心】行缺失"
+        line = match.group(1)
+        tags = line.split("、")
+        # 8D 标签 ≤4（排除财富标签后计数）
+        self.assertLessEqual(len([t for t in tags if t != GAIN_TAG]), 4,
+                             msg=f"8D 标签数超限: {line!r}")
+        # 财富标签 ≤1 且恰在行尾（decision.py 拼接契约：追加行尾）
+        self.assertEqual(tags.count(GAIN_TAG), 1,
+                        msg=f"财富标签数须恰 1，实际: {line!r}")
+        self.assertEqual(tags[-1], GAIN_TAG,
+                        msg=f"财富标签应拼接在行尾，实际: {line!r}")
+        # 显著态行内不存在"心境平稳"（fortune 拼接的替换语义边界）
+        self.assertNotIn("心境平稳", tags)
+        # 最坏拼接行：前缀 6 + 4×4 字标签 + 3 顿号 + 7 字财富标签
+        # + 换行 1 = 34 字符，红线口径 36 封顶
+        state_line = f"【此刻内心】{line}\n"
+        self.assertLessEqual(len(state_line), 36,
+                             msg=f"最坏拼接行 {len(state_line)} 字符超 36:"
+                                 f" {state_line!r}")
 
 
 if __name__ == "__main__":

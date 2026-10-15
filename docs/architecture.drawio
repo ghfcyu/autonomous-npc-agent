@@ -100,7 +100,7 @@
     <mxCell id="27" value="LLM 柔性表达&#10;JSON 动作契约&#10;(Provider 可插拔)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=11" vertex="1" parent="1">
       <mxGeometry x="460" y="880" width="170" height="70" as="geometry" />
     </mxCell>
-    <mxCell id="28" value="决策上下文注入（&lt;35token 极简组装 · T3 落地）&#10;【此刻内心】to_discrete_tags() ≤4 高显著度离散中文标签（替换旧 8 参数浮点文本 · 无浮点向量）&#10;【身份标签】TagLedger.visible_tags() ｜【人际关系】top-3+保底 ｜【周围的人】nearby 亲缘度排序取前5（T4-a 两项裁剪）&#10;【周围的人】World.snapshot() nearby+外观 ｜ 相关长期记忆 + recent(4) 短期记忆裁剪" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=11;fontStyle=1" vertex="1" parent="1">
+    <mxCell id="28" value="决策上下文注入（&lt;35token 极简组装 · T3 落地）&#10;【此刻内心】to_discrete_tags() ≤4 高显著度离散中文标签（替换旧 8 参数浮点文本 · 无浮点向量）+ fortune_tag 财富显著带标签（T5 · 显著才注入）&#10;【身份标签】TagLedger.visible_tags() ｜【人际关系】top-3+保底 ｜【周围的人】nearby 亲缘度排序取前5（T4-a 两项裁剪）&#10;【周围的人】World.snapshot() nearby+外观 ｜ 相关长期记忆 + recent(4) 短期记忆裁剪" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=11;fontStyle=1" vertex="1" parent="1">
       <mxGeometry x="650" y="880" width="820" height="130" as="geometry" />
     </mxCell>
     <mxCell id="29" value="快脑 fast 路径: 命中意图 → SPEAK Action 秒回直达行动层（旁路整个慢脑链 · 0 次 LLM 调用 · 延迟&lt;20ms）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=1" vertex="1" parent="1">
@@ -232,5 +232,30 @@
         </Array>
       </mxGeometry>
     </mxCell>
-  </root>
+  
+<mxCell id="80" value="行为经济学层（T5 · HabitLoop + WealthLedger）" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=14;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
+          <mxGeometry x="1250" y="590" width="230" height="212" as="geometry" />
+        </mxCell>
+<mxCell id="81" value="HabitLoop 习惯回路（第一小步）&#10;杜希格离散截断: 黄昏窗17-18点&#10;IDLE 常客移步酒馆+确定性文案&#10;（线索→惯例→奖赏 0-token）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="1260" y="628" width="210" height="70" as="geometry" />
+        </mxCell>
+<mxCell id="82" value="WealthLedger 财富基准（第二小步）&#10;EWMA: W+=收获估值·R=αW+(1-α)R&#10;享乐适应: 常送礼就不稀罕了&#10;（事件触发离散化 · Tier 0）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="1260" y="712" width="210" height="70" as="geometry" />
+        </mxCell>
+<mxCell id="83" value="建账: generate_village() 25 人创生档案（W=对数正态创生值 · R=W₀ 创生即基准）" style="text;html=1;align=center;verticalAlign=middle;fontSize=10;fontColor=#996600;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1240" y="792" width="250" height="18" as="geometry" />
+        </mxCell>
+<mxCell id="e90" value="item_given → EWMA 更新" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#d79b00;fontSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="5" target="82">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+<mxCell id="e91" value="fortune_tag 离散标签 →【此刻内心】行尾" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#d79b00;fontSize=10;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0" edge="1" parent="1" source="82" target="28">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+<mxCell id="e92" value="酒友/老主顾边 → 习惯集合" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#d79b00;fontSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="12" target="81">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+<mxCell id="e93" value="黄昏聚集 → tavern（0-token）" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#d79b00;fontSize=10;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.3;entryDx=0;entryDy=0" edge="1" parent="1" source="81" target="22">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
 </mxGraphModel>

@@ -14,13 +14,14 @@ import random
 from typing import Any, Dict, List, Optional
 
 from .background_npc import BackgroundNPC
+from .economics import WealthLedger
 from .habit import HabitLoop
 from .llm import create_provider
 from .llm.base import BaseLLMProvider
 from .npc import NPC, Persona
 from .relationships import RelationshipNetwork
 from .states import NPCState
-from .village_genesis import env_mind_for, load_newcomer_configs
+from .village_genesis import env_mind_for, generate_village, load_newcomer_configs
 from .world import Entity, World, WorldEvent
 
 DEFAULT_BG_CONFIG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -57,6 +58,20 @@ class NPCEngine:
         # 玩家实体
         self.world.add_entity(Entity(id="player", kind="player", name="旅行者",
                                      location_id="plaza", inventory=["金币", "苹果"]))
+
+        # T5 第二小步：EWMA 财富基准账本（Tier 0 纯规则零 token）。全村
+        # 25 人建账，初值单一来源复用创生档案 generate_village()（键=
+        # npc_id，profile.innate.wealth 为对数正态创生值，与 EnvMind 初值
+        # 同一 crc32 确定性口径）；ensure_account 幂等。订阅采用按类型
+        # kinds=["item_given"]（EventBus 原生支持，world.py subscribe）
+        # 而非 StateUpdater 的全量订阅——财富基准只消费收获事件，其余
+        # 7 类事件零分发开销。无财富事件时 fortune_tag 全空、prompt
+        # 逐字节不变（基线不变性，token 4519）。
+        self.wealth_ledger = WealthLedger()
+        for _npc_id, _profile in generate_village().items():
+            self.wealth_ledger.ensure_account(_npc_id, _profile.innate.wealth)
+        self.world.bus.subscribe(self.wealth_ledger.on_event,
+                                 kinds=["item_given"])
 
         for persona in (npc_configs if npc_configs is not None else Persona.load_all()):
             self.spawn(persona)
@@ -110,6 +125,11 @@ class NPCEngine:
         # 种子（与 mount_tags 同一确定性口径）。
         if persona.tag_profile == "genesis":
             npc.tag_ledger = self._build_tag_ledger(persona.id)
+        # T5 第二小步：财富账本引用挂到 NPC（tag_ledger 同构接线模式）。
+        # 决策层经 getattr 读取（兼容直接构造/未挂账本的 NPC——None 时
+        # fortune 恒空串，prompt 与接线前逐字节全等）；未建账 npc_id
+        # （自定义测试人格）fortune_tag 同样返回空串，天然零影响。
+        npc.wealth_ledger = self.wealth_ledger
         self.npcs[persona.id] = npc
         return npc
 

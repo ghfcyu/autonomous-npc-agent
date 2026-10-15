@@ -87,14 +87,21 @@ class DecisionEngine:
 
     def _user_prompt(self, player_input: str, world: World,
                      memory_ctx: Dict[str, list], snapshot: Dict[str, Any],
-                     inner_state=None) -> str:
+                     inner_state=None, fortune: str = "") -> str:
         long_term = "\n".join(f"- {m}" for m in memory_ctx.get("long_term", [])) or "（无）"
         recent = "\n".join(f"- {m}" for m in memory_ctx.get("recent", [])) or "（无）"
         state_line = ""
         if inner_state is not None:
             # <35token 极简组装：只注入 ≤4 个高显著度离散中文标签
             # （顿号连接），严禁浮点数字/参数表出现在该行。
-            state_line = f"【此刻内心】{'、'.join(inner_state.to_discrete_tags())}\n"
+            # T5 第二小步：EWMA 财富显著带标签（WealthLedger.fortune_tag
+            # 非空时）拼接——“心境平稳”被替换（8D 全常带与“发了笔
+            # 小财”语义矛盾，且替换不增行宽），其余标签保序后追加在
+            # 行尾；fortune 为空时本行与接线前逐字节全等（基线不变性）。
+            tags = inner_state.to_discrete_tags()
+            if fortune:
+                tags = [t for t in tags if t != "心境平稳"] + [fortune]
+            state_line = f"【此刻内心】{'、'.join(tags)}\n"
         # 周围的人：同地点可见的实体及其外观（空 nearby 不注入，控 token）。
         # T4-a token 裁剪之一：25 NPC 落地后同地点密度上升护栏——先按
         # viewer（persona.id）与各实体的关系亲缘度 |affinity| 降序稳定
@@ -149,10 +156,17 @@ class DecisionEngine:
 
         memory_ctx = npc.memory.context_for(player_input)
         snapshot = world.snapshot(npc.persona.id)
+        # T5 第二小步：EWMA 财富基准的离散显著带标签。getattr 兼容
+        # 直接构造/未挂账本的 NPC（tag_ledger 同一兼容模式）——None
+        # 或未建账时 fortune 恒空串，prompt 与接线前逐字节全等；
+        # 快脑命中路径不经此处，背景 NPC 不进决策链，天然零影响。
+        wealth_ledger = getattr(npc, "wealth_ledger", None)
+        fortune = (wealth_ledger.fortune_tag(npc.persona.id)
+                   if wealth_ledger is not None else "")
         # T2：挂载了标签账本的 NPC 注入身份标签行（getattr 兼容未挂载实例）
         messages = [
             {"role": "system", "content": self._system_prompt(getattr(npc, "tag_ledger", None))},
-            {"role": "user", "content": self._user_prompt(player_input, world, memory_ctx, snapshot, npc.inner_state)},
+            {"role": "user", "content": self._user_prompt(player_input, world, memory_ctx, snapshot, npc.inner_state, fortune)},
         ]
 
         # 2) LLM 生成 + 解析

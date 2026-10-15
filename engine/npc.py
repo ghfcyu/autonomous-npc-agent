@@ -143,7 +143,14 @@ class NPC:
 
     # ------------------------------------------------------------------ #
     def _on_event(self, event: WorldEvent) -> None:
-        """感知：直接涉及自己的事件必可闻，其余按同地点过滤。"""
+        """感知：直接涉及自己的事件必可闻，其余按同地点过滤。
+
+        T5 第三小步：交易事件（item_bought/item_sold）的 payload 用
+        seller/buyer 键（非 item_given 的 to 键）——卖家/买家指向自己的
+        交易按"点名"语义无视距离必可闻（自己的买卖自己必记得，与
+        player_spoke 的 to 键同构）。本改动是交易事件接入记忆链路
+        （MemorySystem.observe 模板）的最小兼容，其余事件感知行为零变化。
+        """
         # 自己产出的动作
         if event.kind == "npc_action" and event.payload.get("npc") == self.persona.id:
             self.memory.observe(event)
@@ -153,6 +160,13 @@ class NPC:
             self.memory.observe(event)
             return
         if event.kind == "item_given" and event.payload.get("to") == self.persona.id:
+            self.memory.observe(event)
+            return
+        # 点名事件：交易（T5 第三小步）——卖家/买家指向自己，无视距离
+        if event.kind == "item_bought" and event.payload.get("seller") == self.persona.id:
+            self.memory.observe(event)
+            return
+        if event.kind == "item_sold" and event.payload.get("buyer") == self.persona.id:
             self.memory.observe(event)
             return
         if event.actor == self.persona.id:

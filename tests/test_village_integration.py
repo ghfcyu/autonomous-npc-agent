@@ -600,7 +600,11 @@ class TestGoodsSuffixBoundary(unittest.TestCase):
         self.assertNotIn("皮甲", reply, msg=f"不得提取「皮甲」: {reply}")
 
     def test_regression_sword_price_unchanged(self):
-        # 回归保护：问什么答什么纪律不回退
+        # 回归保护：问什么答什么纪律不回退。2026-10-16 禀赋溢价功能
+        # 变更使旧断言失效（chen 默认库存含「铁剑」，问价常态回溢价句
+        # 「二十五两」），保护语义平移为清库存场景：清出「铁剑」后
+        # 问价仍回标准报价句（防答非所问 + 锁标准句口径不回退）。
+        self.engine.npcs["chen"].entity.inventory.remove("铁剑")
         reply = self._fast_reply("铁剑多少钱", "chen")
         self.assertIn("铁剑", reply)
         self.assertIn("十两", reply)

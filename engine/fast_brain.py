@@ -18,6 +18,10 @@
 - 意图内容模板全部玩家可感知（问路给真实方向、报时给 world.clock、
   查价按商品词对齐经营范围给报价、presence 确认在场答「在，何事？」），
   无掩码用中性变体（向后兼容）。
+- T5 第三小步（禀赋效应溢价报价）：查价对齐经营范围后先查在库
+  现货（world 实体 inventory 精确匹配）——**在库报禀赋溢价句**
+  （economics.endowment_price 2.5 倍上浮，Kahneman WTA 杯子实验），
+  无库回既有标准句；库存不越经营范围白名单。
 - 回复文本 ≤40 字符（<35token 极简 Prompt 组装规范的出口约束），
   不注入浮点向量。
 - 快脑只消费既有 InnerState 8D 与脾气掩码，不新增任何心理变量系统。
@@ -29,6 +33,7 @@ import re
 from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple
 
 from .actions import Action, ActionType
+from .economics import ITEM_VALUES, cn_amount, endowment_price
 
 if TYPE_CHECKING:  # 仅为类型注解服务，避免运行期循环导入
     from .inner_state import InnerState
@@ -225,6 +230,13 @@ _ROLE_GOODS: Dict[str, frozenset] = {
 }
 _DEFAULT_PRICE = "看货定价，童叟无欺。"
 
+# 禀赋溢价默认估价（T5 第三小步）：商品词不在 economics.ITEM_VALUES
+# 估价表时（如「酱肉」——快脑报价表有、估价表无）按 1 两口径计算
+# 溢价。与 economics.DEFAULT_ITEM_VALUE 同值同语义，本地独立声明
+# 零 import（对齐先例：_GOODS_SUFFIX_CHARS 与 economics 的
+# _COMPOUND_SUFFIX_CHARS 同集合独立声明——防两层耦合的零依赖纪律）。
+DEFAULT_GOODS_VALUE = 1
+
 # 品类后缀单字集合（审查第十次指令 3②）：商品词命中处紧邻的后一个
 # 字符若为其中之一，该命中视为复合品（如「铁剑鞘」不是「铁剑」），
 # 跳过不提取——问「铁剑鞘多少钱」不得答铁剑价，回通用句。
@@ -287,16 +299,33 @@ def _goods_in_text(text: str) -> Optional[str]:
 def _content_price(npc: "NPC", world: "World", query: str) -> str:
     """查价回复：问什么答什么；无法对齐商品回通用句，严禁答非所问。
 
-    商品词命中且属于该 NPC 经营范围（persona.role → _ROLE_GOODS
-    白名单）→ 回对应报价句；越界商品（问铁匠「皮甲多少钱」）、
-    未知商品（「锄头多少钱」）与无商品词问句 → 一律回 _DEFAULT_PRICE
-    通用句，绝不把职业默认报价顶在任意问价句上（问铁锤答铁剑=审查
-    点名的答非所问缺陷）。
+    T5 第三小步（禀赋效应溢价报价，2026-10-16 PM 裁定「现货=拥有=
+    常态禀赋溢价」）：商品词命中且属于该 NPC 经营范围（persona.role
+    → _ROLE_GOODS 白名单）时，先查 world.entities[npc.persona.id]
+    .inventory 是否持有该商品（List[str] 精确字符串匹配）——
+    **持有 → 回禀赋溢价句**（Kahneman 杯子实验 WTA 语义：拥有即惜售，
+    要价 = economics.endowment_price 2.5 倍四舍五入上浮，数字由
+    cn_amount 运行期生成，不手写数字常量）；**未持有 → 回既有
+    _PRICE_LINES[goods] 标准句（逐字节不变，零回归）**。
+    防御性回退（安全回退，不炸不猜）：npc.persona.id 不在
+    world.entities（防御性 get），或实体无 inventory 属性（异常
+    构造的世界）→ 一律回标准句。
+    越界商品（问铁匠「皮甲多少钱」）、未知商品（「锄头多少钱」）
+    与无商品词问句 → 一律回 _DEFAULT_PRICE 通用句——经营范围
+    白名单先于库存检查（库存不越经营范围），绝不把职业默认报价
+    顶在任意问价句上（问铁锤答铁剑=审查点名的答非所问缺陷）。
     """
     goods = _goods_in_text(query)
-    if goods is not None and goods in _ROLE_GOODS.get(npc.persona.role, frozenset()):
-        return _PRICE_LINES[goods]
-    return _DEFAULT_PRICE
+    if goods is None or goods not in _ROLE_GOODS.get(npc.persona.role,
+                                                      frozenset()):
+        return _DEFAULT_PRICE
+    line = _PRICE_LINES[goods]
+    entity = world.entities.get(npc.persona.id)
+    inventory = getattr(entity, "inventory", None)
+    if inventory is not None and goods in inventory:
+        price = endowment_price(ITEM_VALUES.get(goods, DEFAULT_GOODS_VALUE))
+        return f"{goods}{cn_amount(price)}两，看对眼才卖。"
+    return line
 
 
 def _content_time(npc: "NPC", world: "World", query: str) -> str:

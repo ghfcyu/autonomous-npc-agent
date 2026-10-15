@@ -107,6 +107,11 @@ class TestTavernCoreUpgrade(unittest.TestCase):
         engine = self.engine
         self.assertEqual(engine.npcs["tavern_sun"].entity.inventory,
                          ["米酒", "酱肉"], msg="tavern_owner 初始库存应为米酒/酱肉")
+        # 2026-10-16 禀赋溢价功能变更使旧断言失效（初始库存含「米酒」
+        # → 问价常态回溢价句「五两」），保护语义平移为清库存场景：
+        # 清出「米酒」后问价仍回标准报价句（有库存溢价态由
+        # tests/test_fast_brain_endowment.py 锁「五两」）。
+        engine.npcs["tavern_sun"].entity.inventory.remove("米酒")
         before = engine.llm.call_count
         result = engine.player_says("米酒多少钱", "tavern_sun")
         self.assertTrue(result["ok"])

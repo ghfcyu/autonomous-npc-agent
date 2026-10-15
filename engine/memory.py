@@ -133,6 +133,10 @@ class MemorySystem:
         templates = {
             "player_spoke": ("玩家说：{text}", 0.6),
             "item_given": ("收到来自 {actor} 的物品：{item}", 0.8),
+            # T5 第三小步：交易事件（NPC 视角文案，importance 0.6——低于
+            # 赠予 0.8，交易是日常；不足 0.7 阈值不直写长期记忆，仅短期）
+            "item_bought": ("{actor}从我手里买走了{item}，收了{price}两", 0.6),
+            "item_sold": ("{actor}把{item}卖给了我，付了{price}两", 0.6),
             "player_entered": ("{actor}（{name}）来到了 {location}", 0.4),
             "entity_moved": ("{actor} 离开了", 0.2),
             "weather_changed": ("天气变成了 {weather}", 0.2),

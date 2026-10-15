@@ -422,7 +422,38 @@ fortune_tag(npc_id)：gain_ratio=(W−R)/max(R,1) ≥ 0.25
 - **EWMA 机制与享乐适应语义**：NPC 对财富得失的感知是相对心理参考基准点 R 的（前景理论参考点依赖），而非绝对加总——铁匠陈（创生财富 30）收一把铁剑（估值 10）：gain_ratio = 10/30 ≈ 0.333 → 触发"最近发了笔小财"进【此刻内心】行；连送第二把 0.250、第三把 0.200 → 标签熄灭（**常送礼就不稀罕了**，逐笔严格递减的享乐适应）。α=0.5 校准：一礼半适应的中庸锚点（过小则常送礼仍稀罕、过大则当刻即吞没永不触发），兼为 2 的负幂浮点精确可复现。冷启动种子豁免为契约内自由裁量（书面论证见 economics.py docstring）：字面公式无豁免时首笔收获当刻被半吸收，chen 收铁剑仅 0.143 < 0.25 显著带永不触发，且可证任何 R₀ 初始化均无解（首笔触发需 G₀≥6.67 与静默对照需 G₀<6 矛盾）；首笔种子 + 第二笔起字面 EWMA 是验收探针可满足的唯一口径
 - **六情边界（共线性纪律）**：item_given 的情绪语义已由荀子六情映射独占（StateUpdater → 六情"好"矢量 → e_P 增量 + 亲缘度入关系网）；WealthLedger 是独立经济变量层，**严禁再改任何 8D 心智参数**（同一事件双份情绪增量=两套情绪系统漂移死穴）；行为出口只有 fortune_tag 离散中文标签，浮点 W/R/gain_ratio 永不进 prompt（<35token 规范）
 - **成本账 0-token**：纯规则 Tier 0——不持有 LLM 引用、不组装 prompt；按类型订阅只消费 item_given；核心 NPC 才走决策组装路径（快脑命中/背景 NPC 天然零影响）；无财富事件时 fortune 全空、prompt 逐字节全等——token 基线 4519 不变（实测严格相等，基线不变性测试锁）
-- **损失域诚实登记**：本小步只实现收获域（gain），W 只增不减；损失域（支出/被夺/卖传家宝）、2.5 倍禀赋效应、损失域豪赌留待交易 API 小步——引擎落地交易系统前不做纸面模拟（诚实登记非承诺债）
+- **损失域诚实登记**：本小步只实现收获域（gain），W 只增不减；损失域（支出/被夺/卖传家宝）、2.5 倍禀赋效应、损失域豪赌留待交易 API 小步——引擎落地交易系统前不做纸面模拟（诚实登记非承诺债）→ **已于第三小步清偿（见下）**
+
+#### 第三小步已落地（2026-10-16）：交易 API 最小闭环 + 损失域 + 禀赋效应（审查指令 1）
+
+> 三件套收口关键路径：交易事件源落地终结"W 只增不减"现状。`NPCEngine.player_buys` / `player_sells` 双入口 + `WealthLedger` 扩支出侧 + 快脑禀赋溢价报价，全部 Tier 0 纯规则 0-token。
+
+```
+玩家 ──player_buys(npc, item)──▶ 核心 NPC（有库存才卖：out_of_stock 拒绝）
+    price = endowment_price(estimate_value) = 2.5×标准价（WTA 卖出要价）
+    手动库存转移（不经 transfer_item——防 item_given 双事件双记账）
+    发布 item_bought {seller, item, price} ─▶ WealthLedger.apply_gain(price)
+                                              （NPC 收钱，收获域既有语义）
+玩家 ──player_sells(npc, item)──▶ 核心 NPC（宽松成交：与 player_gives 同构）
+    price = estimate_value（WTP 收购出价=标准价，不压价）
+    发布 item_sold {buyer, item, price} ─▶ WealthLedger.apply_loss(price)
+                                           （NPC 付钱，W-=price，R 纹丝不动）
+    NPC 记忆：item_bought/item_sold 模板（importance 0.6 日常档），
+    seller/buyer 点名感知无视距离（与 player_spoke 的 to 键同构）
+
+快脑查价联动（玩家可感知通道）：
+    _content_price 命中经营范围商品词 → 查该 NPC 实体 inventory 持有现货
+    → 持有：禀赋溢价句「{goods}{cn_amount(endowment_price)}两，看对眼才卖。」
+    → 未持有：既有标准句逐字节不变（零回归）
+```
+
+- **损失域基准粘性（本步灵魂语义）**：收获侧基准**半吸收**（暖态 R=αW+(1-α)R，享乐适应第三把剑 tag 熄灭）vs 损失侧基准**零吸收**（R 恒定，痛感不钝化）——同量纲对照断言（tests/test_trade.py）：chen W₀=30 连卖三把铁剑（每把 10 两），loss_ratio 0.333→0.667→1.000，"最近手头紧"标签**逐笔持续不熄**；对照组连收三把第三笔"小财"熄灭。收获钝化 vs 损失全保留的不对称，正是损失厌恶（人对损失的痛感约为等量收获快感的 2.5 倍）的离散工程根源；W 允许减到负数（账面赤字=赊账事实，账本如实登记，max(R,1) 分母防退化）
+- **禀赋效应 WTA/WTP 实验结构**：同一把铁剑，玩家 10 两卖给铁匠（estimate_value 标准价收购）、铁匠 25 两卖回给玩家（endowment_price 2.5×四舍五入溢价）——WTA(卖出要价) > WTP(买入出价) 的经典不对称；快脑查价联动让玩家**默认场景即可感知**（走进铁匠铺问价，chen 对自己打的剑开口就是二十五两——Kahneman 杯子实验的"拥有即惜售"）。计价口径单一来源：economics.endowment_price（engine 交易 API 与 fast_brain 报价共用，报价句数字运行期生成不手写常量）
+- **六情边界延续（共线性纪律）**：item_bought/item_sold 是纯经济事件——六情映射不认识它们是设计内边界（交易的情绪表达由 fortune_tag 双向离散标签独占：损失走"最近手头紧"标签，不产生 8D 增量）；tests/test_trade.py 有交易前后 8D 逐项不变断言 + economics.py 零 inner_state import 的架构边界断言（延续 test_economics.py ast 先例）
+- **背景 NPC 交易入口评估（审查指令 1④，PM 书面裁定：本步不开放）**：player_buys/player_sells 与 player_gives 同口径只认核心 3 NPC（self.npcs）；背景 NPC 账本**事件层可达**（第 14 次审查亲测 herb_boy 直发 item_given 可入账）。不开放玩家入口的理由：①交易体验的核心是议价对话与惜售话术（慢脑 LLM 能力），背景 NPC 无慢脑，开放只产生"沉默成交"的低体验交互；②玩家在村庄的交易对象天然是铁匠/杂货/酒馆——3 核心恰好覆盖三类店铺经营者，体验完备；③成本面：规则成交文案需另写一套非本步余力。未来开放路径已就绪：入口一行注册（self.background_npcs 校验）+ Tier 0 规则成交文案，登记 T6/远期窗口再评估
+- **成本账 0-token**：交易 API 纯规则确定性（计价/库存转移/事件发布/文案拼接全部零 LLM）；快脑溢价报价 0-token 秒回（LLM call_count==0 断言）；无交易时 fortune 空路径 prompt 逐字节全等——token 基线 4519 实测不变（容忍带内零影响，tests/test_token_baseline_deterministic.py 绿）
+- **验收标准（玩家可感知口径，审查"交易心理可感知"执法）**：①端到端买卖账面真实变动+库存真实转移；②损失标签与 GAIN_TAG 对称（含享乐适应损失侧对照——痛感持续不熄的灵魂断言）；③禀赋估值上浮 2.5 倍有测试（无库存拒绝/有库存溢价）；④对话情境分叉 prompt 内容级断言（卖出后【此刻内心】行含"最近手头紧"）；⑤快脑默认场景溢价报价可见；验收见 tests/test_trade.py（22 用例）+ tests/test_fast_brain_endowment.py（11 用例）
+- **余项（损失域豪赌）**：亏损状态下的风险偏好反转（豪赌）依赖"亏损状态"感知出口——损失标签已就位，留待 T6 窗口按余力评估（依赖交易频率真实数据先行观察）
 
 #### 附：核心 NPC（chen）习惯回路接入评估（2026-10-15，清偿 10-14 遗留 1）
 

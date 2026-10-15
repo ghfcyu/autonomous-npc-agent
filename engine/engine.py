@@ -14,7 +14,7 @@ import random
 from typing import Any, Dict, List, Optional
 
 from .background_npc import BackgroundNPC
-from .economics import WealthLedger
+from .economics import WealthLedger, cn_amount, endowment_price, estimate_value
 from .habit import HabitLoop
 from .llm import create_provider
 from .llm.base import BaseLLMProvider
@@ -63,15 +63,18 @@ class NPCEngine:
         # 25 人建账，初值单一来源复用创生档案 generate_village()（键=
         # npc_id，profile.innate.wealth 为对数正态创生值，与 EnvMind 初值
         # 同一 crc32 确定性口径）；ensure_account 幂等。订阅采用按类型
-        # kinds=["item_given"]（EventBus 原生支持，world.py subscribe）
-        # 而非 StateUpdater 的全量订阅——财富基准只消费收获事件，其余
-        # 7 类事件零分发开销。无财富事件时 fortune_tag 全空、prompt
-        # 逐字节不变（基线不变性，token 4519）。
+        # kinds（EventBus 原生支持，world.py subscribe）而非
+        # StateUpdater 的全量订阅——账本只消费财富事件，其余事件零
+        # 分发开销。T5 第三小步：kinds 扩为三类——item_given（赠予收获
+        # 域，apply_gain）+ item_bought（NPC 卖出收钱，apply_gain 成交
+        # 价）+ item_sold（NPC 买入付钱，apply_loss 标准价）；无财富事件
+        # 时 fortune_tag 双向均空、prompt 逐字节不变（基线不变性，
+        # token 4519）。
         self.wealth_ledger = WealthLedger()
         for _npc_id, _profile in generate_village().items():
             self.wealth_ledger.ensure_account(_npc_id, _profile.innate.wealth)
         self.world.bus.subscribe(self.wealth_ledger.on_event,
-                                 kinds=["item_given"])
+                                 kinds=["item_given", "item_bought", "item_sold"])
 
         for persona in (npc_configs if npc_configs is not None else Persona.load_all()):
             self.spawn(persona)
@@ -264,6 +267,71 @@ class NPCEngine:
 
         return {"ok": True, "item": item, "to": npc_id,
                 "from_inventory": from_inventory}
+
+    # ------------------------------------------------------------------ #
+    def player_buys(self, npc_id: str, item: str) -> Dict[str, Any]:
+        """玩家从核心 NPC 手里买走物品（T5 第三小步：交易 API 买入侧）。
+
+        计价：base = estimate_value(item)；price = endowment_price(base)
+        = 2.5×标准价——**禀赋溢价**（WTA 卖出要价），与 player_sells 的
+        标准价收购（WTP 买入出价）构成禀赋效应实验结构：同一把铁剑，
+        玩家 10 两卖给铁匠（estimate_value）、铁匠 25 两卖回给玩家
+        （2.5×）。库存口径（自由裁量，PM 契约裁定）：**只卖 NPC 库存
+        里有的**（精确字符串匹配，无库存 out_of_stock 拒绝）——能
+        买到的一定是他拥有的，全部走禀赋溢价，不做无中生有的挂单；
+        背景 NPC 不开放玩家交易（PM 书面评估裁定：背景 NPC 零 LLM
+        零 prompt，交易闭环只进核心 NPC——npc_id 不在 self.npcs 即
+        unknown npc，背景 id 天然被拒）。库存转移**手动执行**（不走
+        world.transfer_item——它内部自动发布 item_given 会造成一笔交易
+        双事件双记账，账本收到假赠予），唯一事件源是本方法发布的
+        item_bought。回复确定性拼接（cn_amount 中文读数，≤40 字符，
+        零 LLM）。
+        """
+        if npc_id not in self.npcs:
+            return {"ok": False, "reason": "unknown npc"}
+        src = self.world.entities[npc_id]
+        if item not in src.inventory:
+            return {"ok": False, "reason": "out_of_stock"}
+        base = estimate_value(item)
+        price = endowment_price(base)
+        # 手动库存转移：src remove / dst append（不经 transfer_item 防双事件）
+        src.inventory.remove(item)
+        self.world.entities["player"].inventory.append(item)
+        self.world.bus.publish(WorldEvent(
+            self.world.tick_count, "item_bought", "player",
+            {"seller": npc_id, "item": item, "price": price}))
+        return {"ok": True, "item": item, "from": npc_id, "price": price,
+                "endowment_premium": True,
+                "reply": f"「{item}你拿好，{cn_amount(price)}两不二价。」"}
+
+    # ------------------------------------------------------------------ #
+    def player_sells(self, npc_id: str, item: str) -> Dict[str, Any]:
+        """玩家把物品卖给核心 NPC（T5 第三小步：交易 API 卖出侧）。
+
+        计价：price = estimate_value(item)——**收购按标准价不压价**。
+        不对称结构（禀赋效应实验，与 player_buys 互为表里）：NPC 买入
+        出价 WTP=标准价 vs 卖出要价 WTA=2.5×标准价，同一物品两价之比
+        即损失厌恶 2.5 倍的行为出口；账本侧对应收获半吸收 vs 损失零
+        吸收（WealthLedger.apply_loss 的基准粘性）。库存转移**手动执行**
+        （同 player_buys：不走 transfer_item 防双事件）；玩家库存无该
+        物品时**宽松成交**（与 player_gives 宽松模式同构——玩家侧库存
+        不做严格模拟，NPC 侧记账照常）。回复确定性拼接（cn_amount
+        中文读数，≤40 字符，零 LLM）。
+        """
+        if npc_id not in self.npcs:
+            return {"ok": False, "reason": "unknown npc"}
+        price = estimate_value(item)
+        player_inv = self.world.entities["player"].inventory
+        if item in player_inv:
+            # 手动库存转移：src remove / dst append（不经 transfer_item 防双事件）
+            player_inv.remove(item)
+            self.world.entities[npc_id].inventory.append(item)
+        # 宽松模式：玩家库存无该物品时不做严格模拟，仅发布事件保证 NPC 记账
+        self.world.bus.publish(WorldEvent(
+            self.world.tick_count, "item_sold", "player",
+            {"buyer": npc_id, "item": item, "price": price}))
+        return {"ok": True, "item": item, "to": npc_id, "price": price,
+                "reply": f"「{item}我收下了，{cn_amount(price)}两付你。」"}
 
     # ------------------------------------------------------------------ #
     def player_changes_appearance(self, changes: Dict[str, str]) -> bool:

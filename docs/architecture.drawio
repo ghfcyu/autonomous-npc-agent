@@ -1,4 +1,4 @@
-<mxGraphModel dx="1600" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1640" pageHeight="1480" math="0" shadow="0">
+<mxGraphModel dx="1600" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1640" pageHeight="1560" math="0" shadow="0">
   <root>
     <mxCell id="0" />
     <mxCell id="1" parent="0" />
@@ -224,7 +224,7 @@
         </Array>
       </mxGeometry>
     </mxCell>
-    <mxCell id="66" value="敌意边注入（T4-c）· affinity&lt;0 → 反应文案敌意前缀（零 LLM）" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#b85450;fontSize=11;exitX=1;exitY=0.8;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0" edge="1" parent="1" source="12" target="20">
+    <mxCell id="66" value="敌意边注入（T4-c）· affinity&lt;0 → 反应文案敌意前缀（零 LLM）" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#b85450;fontSize=11;exitX=1;exitY=0.8;exitDx=0;exitDy=0;entryX=0.9;entryY=1;entryDx=0;entryDy=0" edge="1" parent="1" source="12" target="20">
       <mxGeometry relative="1" as="geometry">
         <Array as="points">
           <mxPoint x="1590" y="522" />
@@ -257,5 +257,28 @@
 <mxCell id="e93" value="黄昏聚集 → tavern（0-token）" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#d79b00;fontSize=10;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.3;entryDx=0;entryDy=0" edge="1" parent="1" source="81" target="22">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
+
+<mxCell id="94" value="村庄社会生态层（审查14指令2 · SocialLoop · 0-token 纯规则）" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=13;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
+          <mxGeometry x="60" y="1368" width="380" height="120" as="geometry" />
+        </mxCell>
+<mxCell id="95" value="SocialLoop 社交回路&#10;（engine/socialize.py · 审查14指令2）&#10;五闸门: 亲和≥0（敌意排除）/背景范围/每对每天/同地/WORKING·IDLE → npc_action 搭话&#10;文案池: 师徒双视角/家人/邻里/交情/往来 · payload with/relation 出口 · 零 LLM 零 token" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="80" y="1404" width="340" height="72" as="geometry" />
+        </mxCell>
+<mxCell id="e94" value="44 条关系边 → 同地对扫描（确定性 · 每对每天一次）" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#b85450;fontSize=10;exitX=1;exitY=0.9;exitDx=0;exitDy=0;entryX=1;entryY=0.85;entryDx=0;entryDy=0" edge="1" parent="1" source="12" target="94">
+          <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="1628" y="541" />
+          <mxPoint x="1628" y="1470" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+<mxCell id="e95" value="npc_action 搭话回流（with/relation · 同地核心NPC记忆+玩家事件流）" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;strokeColor=#888888;fontSize=10;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.62;entryDx=0;entryDy=0" edge="1" parent="1" source="94" target="3">
+          <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="40" y="1428" />
+          <mxPoint x="40" y="255" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
       </root>
 </mxGraphModel>

@@ -465,6 +465,156 @@ fortune_tag(npc_id)：gain_ratio=(W−R)/max(R,1) ≥ 0.25
 - **远期展望（本周期不实施）**：若未来接入，可走"收工酒"变体——chen 19:00 IDLE 短暂移步酒馆、20:00 作息接管归家（需 `NPC.apply_schedule` 扩展非居所中转点语义，记忆成本须先做窗口影响实测），仅记录于文档远期章节。
 
 
+### 村庄社会生态 v2：NPC 间社交互动最小闭环（第十四次审查指令 2，2026-10-16）
+
+> 审查指令 2（reviews/review-2026-10-15.md）：落地"NPC 间社交互动事件最小闭环"——活村庄从生活节律（T5 习惯回路：黄昏聚集）到社会生态（同地关系边搭话）。`engine/socialize.py` `SocialLoop`：关系边驱动的确定性搭话，纯规则 Tier 0/1 封印层 0-token，44 条既有关系边零新增配置。
+
+```
+关系网（configs/relationships.json，44 条既有边，零新增配置）
+    │  SocialLoop.apply(world.hour) 每 tick 遍历一次
+    │  （文件插入序=确定性），五层闸门全过才互动：
+    │  ① 亲和：affinity >= 0（敌意边排除——冲突语义由 T4-c
+    │     敌意前缀单出口独占，双机制=共线性死穴）
+    │  ② 范围：双方均背景 NPC 且不同（核心 NPC 有 LLM 对话链，
+    │     规则搭话不与其重叠）
+    │  ③ 判重：无序对 tuple(sorted((s,t))) 当天至多一次
+    │     （_day 由 hour 23→0 回绕推导——World 无 day 属性，
+    │      回绕是唯一合法日界；回绕清空判重集合，次日可再互动）
+    │  ④ 位置：两实体 location_id 相同（社交必须面对面）
+    │  ⑤ 状态：双方 state_str ∈ {WORKING, IDLE}（None=作息
+    │     未应用保守不动；SLEEPING 深夜同屋不闲聊）
+    ▼
+EventBus 发布 npc_action {summary, npc, with, relation}
+    （文案池按 relation 单一查表分派：师父/师傅→徒弟视角池、
+     徒弟→师父视角池、血缘类（KIN_RELATION_TYPES 单一来源
+     import 自 background_npc，公开别名导出）→家人池（方向
+     无关，不用爹/娘称呼）、邻居→邻里池、恩人/老友/酒友/病人
+     →交情池、主顾/老主顾/供货商/同行/同僚/货源/东家→往来池、
+     未映射类型→交情池兜底；per-pair 触发计数取模轮转，
+     跨天续接，与 HABIT_TEMPLATES 轮换同构）
+    ▼
+同地核心 NPC 记忆（NPC._on_event 同地过滤 → MemorySystem.observe）
++ 玩家事件流（status()["recent_events"] 最近 12 条可见）
+```
+
+- **调用顺序（引擎接线）**：`NPCEngine.tick()` 中 `HabitLoop.apply` 之后 `SocialLoop.apply`——先习惯聚集落位、后社交扫描同地对：黄昏 17 点 HabitLoop 把三常客拉进酒馆后，guard_wang→doc_qin（恩人）/ guard_wang→fisher_zhou（酒友）两条同地边即刻被扫描命中——聚集与搭话的因果链（测试断言该两对恰于 hour 17 触发）。
+- **默认村庄基线（实测锁定，tests/test_social_interaction.py）**：全天 24 次 tick(60)（08:00→次日 08:00 跨日界）共 10 次互动、6 个唯一对、每天内每对恰一次——day 1：hour 12 三对（farmer_wang→zhao_daniu 儿子@plaza / herb_boy→doc_qin 师父@clinic / cobbler_jia→carpenter_lu 邻居@carpentry）+ hour 15 一对（boy_shitou→master_wen 师父@school）+ hour 17 两对（酒馆，见上）；day 2：次日清晨 5/6/7 点 WORKING 表项重注册，4 对再互动一次（日界回绕判重清零是设计行为，非 bug）。冤家对（miller_qian/fisher_zhou）永不同地且敌意被亲和闸门排除，零互动。日间四对首触于 hour 12/15 而非更早：世界 08:00 起，各 NPC 作息表 WORKING 转移点（5/6/7 点）早于起点，state_str 直到首个被 tick 命中的表项小时（12/15 点 IDLE）才注册，状态闸门保守不动（沿 HabitLoop 纪律）。
+- **token 成本账 0-token**：SocialLoop 与 HabitLoop/EnvMind 同属 Tier 0/1 封印层——不持有任何 LLM 引用、不组装任何 prompt、零 token；行为出口仅为 npc_action 确定性中文文案（NPC 不位移、不改状态、不改关系）。社交互动均不在 chen@forge/lily@market 同地，不进其对话时刻记忆窗口——token 基线 4519 实测不变（tavern_sun@tavern 同地可感知 hour 17 两条酒馆搭话进其记忆，但其不在基线对话场景，零 token 影响）。
+- **验收标准（审查验收口径）**：①payload 的 `with`/`relation` 两键为「断言互动双方与关系边类型」的数据出口（测试逐事件断言双方与关系类型）；②玩家可感知——status() recent_events 可见互动文案（含双方名）；③五层闸门逐条正反用例（亲和含 0 边界/范围含自环与核心排除/判重含双向边与同 hour/位置/状态含 None 与 SLEEPING）；④文案池分派（含徒弟边走师父视角池、未映射兜底、跨天轮转确定性）；⑤day 回绕判重（23→0 后同对可再互动）；⑥relationships=None 零行为向后兼容；⑦背景 NPC 零 LLM。验收见 `tests/test_social_interaction.py`（6 测试类 33 用例：闸门/分派/日界/None 兼容/最小夹具端到端/默认村庄全天基线）。
+
+
+### 把柄与瞬态玩法层 v2：T6 启动提案（审查 14 指令 3②，2026-10-16 书面化，未实施）
+
+> T6「把柄博弈与瞬态」预研书面化：把柄勒索 + 醉酒结算（酒量属性→重度醉酒 TTL 瞬态标签）+ 瞬态标签生命周期。核心结论先行：**所有基础设施均已就位且有测试**——把柄账本（`TagLedger.secrets()`，3 核心 NPC 各挂 1 条 rare 把柄）、瞬态 TTL 桶（`tag_mount.py:280 add_transient` + `:299 tick()`，`tests/test_tag_mount.py:204` 已用"重度醉酒"做生命周期测试）、酒量属性（`tag_genesis.py:27 alcohol_tol`，25 人值已生成）、敌意前缀管道（`background_npc.py HOSTILE_PREFIXES`）、tavern_sun 跨对话记忆（`tests/test_tavern_memory.py` 5 用例锁定）。唯一真实缺口是**引擎侧从未调用 `ledger.tick()`**（瞬态生命周期"有桶无泵"）与**核心 NPC 对玩家的敌意文案出口无消费点**（`_social_prefix` 对 actor=="player" 显式返回空串）。实施待 T5 收口后按余力；本提案为设计冻结版，对抗执法口径（玩家可感知+真实数据驱动）逐条预答。
+
+#### 1. 玩法设计
+
+**1.1 勒索方向裁定：玩家侧入口 + NPC 侧反应出口（不做 NPC→玩家、不做 NPC 间）**
+
+依据（四条）：①把柄挂载现状——全村仅 3 核心 NPC 有账本把柄（chen=私生血统/lily=私铸劣币/tavern_sun=暗夜杀人，均 rare 档），22 背景 NPC 天然零挂载（不在 `self.npcs`，规范 5.2"非纯背景"语义）——NPC 间勒索需双方账本+双方决策能力，范围失控；②NPC 对玩家勒索需"玩家把柄"数据源——纯发明无依据，对抗预告条款直接判死；③规范 8 节案例（醉酒铁匠被铅模勒索）本身即玩家→NPC；④玩家侧 API 入口对齐 `player_buys`/`player_sells` 前例（确定性判定+事件发布+记忆模板），可确定性验收。
+
+**勒索最小闭环数据流**（发现→知情→要挟→得手→余波，全链确定性）：
+
+```
+玩家 ──player_gives(npc, 米酒)──▶ 醉账累计（IntoxicationLedger 订阅 item_given，
+                                    仅核心 3 NPC 可被赠饮——player_gives 入口天然限定）
+    累计碗数 ≥ ceil(4 × alcohol_tol / 5)（规范 4.3 锚点：tol=5.0 四角大醉）
+    ▼
+重度醉酒结算：TagLedger.add_transient("烂醉如泥", ttl=4 小时)（规范 6.1 明示时长）
+    + 失态 npc_action 确定性文案（同地点 tavern_sun 全量感知进记忆——"掌柜的什么都看在眼里"）
+    + 醉者自身失态记忆（victim 点名感知，importance ≥0.7 长期直写——次晨记得自己失态）
+    + 若玩家同地点在场：醉话半泄露句（按把柄 tag_id 配确定性醉话池）
+      + engine 登记 player_knowledge[npc_id]（知情即筹码，纯数据层 0-token）
+    ▼
+玩家 ──player_blackmails(npc_id)──▶ 判定 player_knowledge 命中该 NPC 把柄
+    （无知情/无把柄 → {"ok": False, "reason": "no_leverage"} 确定性回绝）
+    ▼
+勒索结算（全 Tier 0 确定性，0-token 主体）：
+    ① 封口物：NPC 库存按估值降序取最高者手动转移给玩家（沿 player_buys 手动
+       转移防双事件先例；空库存则无实物，诚实登记不发明数字）
+    ② WealthLedger.apply_loss(estimate_value(封口物))——被夺痛感与交易损失
+       同口径，联动"最近手头紧"标签（零新机制）
+    ③ 敌意边：update_affinity(npc→player, -1.0)（默认客人 0.5 → -0.5，
+       落入 to_prompt_text 既有敌意渲染带 <-0.3；一次勒索终身记仇）
+    ④ 余波瞬态标签：add_transient("把柄被攥", ttl=24 小时, secret=True)
+    ⑤ blackmail 事件（victim 点名感知，importance 0.9 长期直写——重大事件）
+       + npc_action 成交文案（同地点 tavern_sun 感知——村里大事瞒不过掌柜）
+    ▼
+余波期（24h）玩家可感知出口：
+    ① 慢脑 user prompt 注入【把柄】行（见成本账，LLM 演心虚/讨好/怀恨）
+    ② 垫话敌意前缀（HOSTILE_PREFIXES 池复用，冷哼轮转——每次说话甩冷脸）
+    ③ 【人际关系】行渲染"敌意 0.5"（relationships.py:83 既有负值分支零改动）
+```
+
+**1.2 醉酒结算：酒量属性直接消费先天 6D，不新增独立字段**
+
+裁定依据：①`InnateAttributes.alcohol_tol` 已存在（`tag_genesis.py:27`，μ=5.0 σ=1.5 依规范 4.3 第 5 条明示偏离总述 σ=1.25），25 人值已真实生成（实测：tavern_sun 2.84 / lily 2.96 / chen 5.90 / doc_qin 6.47 全村最高 / boy_shitou 2.26 最低）——新独立字段=同一现象两套变量=共线性死穴；②消费路径沿 `WealthLedger.ensure_account` 先例：`generate_village()` 单一来源取 `profile.innate.alcohol_tol`，零新增配置。
+
+- **饮酒事件源**：复用 tavern_sun 卖酒/交易链路——玩家 `player_buys("tavern_sun", "米酒")`（米酒在其经营范围与默认库存 `_initial_inventory`，禀赋溢价 5 两）→ `player_gives(npc, "米酒")` 赠饮 → item_given 事件。酒账订阅 item_given，物品词含"酒"字符判定为酒（米酒/陈酿类，确定性），每件 +1 碗（快脑报价"米酒一钱一碗"——一碗=一件口径）。
+- **醉度结算**：烂醉所需碗数 = ceil(4 × alcohol_tol / 5)（规范 4.3 锚点"5.0：两角微醺，四角大醉"的离散换算）。分叉实测：tavern_sun（2.84）第 3 碗烂醉 / lily（2.96）第 3 碗 / chen（5.90）第 5 碗 / doc_qin（6.47）第 6 碗——酒量属性驱动的玩家可感知分叉，无任何手写常量。
+- **连续代谢曲线砍除**（纸面哲学纪律）：不做每小时代谢率/血液酒精浓度——玩家可感知的只有"几碗倒"与"多久醒"，离散为累计阈值+TTL 两参数。
+- **重度醉酒 TTL 瞬态标签**：`add_transient("烂醉如泥", ttl=4)`，TTL 单位=世界小时（见 1.3）；烂醉期再赠酒照常累计且 TTL 覆盖重置（`tag_mount.py:282` docstring 已写"又一轮买醉刷新醉酒时长"——语义现成）。
+- **瞬态期间玩家可感知出口（≥3 个，全部 0-token）**：
+  1. **慢脑身份标签行自动带"烂醉如泥"**——TRANSIENT 桶已在 `visible_tags()` 渲染序（INNATE→ACQUIRED→TRANSIENT→RELATIONAL，`tag_mount.py:314`），决策层 identity_line 自动消费（`decision.py:66-70`）——**零新注入机制**，"断指的铁匠今天烂醉如泥"同框自然；LLM 文风转醉话。
+  2. **交易拒绝**：`player_buys`/`player_sells` 前置检查烂醉标签 → 确定性拒绝文案「（趴在桌上打鼾）……嗝……买卖……明儿再说……」。
+  3. **垫话/快脑醉变体**：垫话层醉酒覆盖（"（舌头打结）嗝……说、说啥？"类确定性池轮转）；快脑回复前置醉前缀"（打着酒嗝）"——问烂醉的孙掌柜报时也带酒嗝，日常句快脑照常秒回（醉汉也能答"在，何事？"）。
+  4. **次晨跨对话记忆引用**：失态记忆（importance ≥0.7 长期直写）+ tavern_sun 同地点感知记录——次日对话【相关长期记忆】含"烂醉失态"模板产物，复用 `tests/test_tavern_memory.py` 的内容级断言模式（对照组无饮酒则无）。
+
+**1.3 瞬态标签生命周期：结构零改动，仅引擎接线**
+
+- **现状评估**：`tag_mount.py` 四时态桶结构完备——TRANSIENT 桶、`_ttl` 独立计数器、`add_transient`（覆盖重置 TTL）、`tick()`（递减+归零自动注销+返回到期标签）、`visible_tags` 渲染序、`unmount` 显式剥夺（TRANSIENT 可剥夺，未来"解酒"玩法入口不用新写）。`tests/test_tag_mount.py:204-210` 已用"重度醉酒"TTL=2 做生命周期红绿测试。**结论：无需扩瞬态桶**。
+- **唯一缺口**：生产路径无人调用 `ledger.tick()`（grep 证实仅测试调用）——"有桶无泵"。最小改动：`NPCEngine.tick()` 末尾对 `self.npcs` 各 `npc.tag_ledger` 按小时判重调一次 `tick()`（沿 EnvMind `_last_evolved_hour` 同 hour 多次 tick 只递减一次的同构模式，10 分钟粒度一天 144 次 tick 只走 24 步）；TTL 单位约定 = 1 次 `ledger.tick()` = 1 世界小时（调用频率锚到小时变更，tag_mount 本体零改动）。
+- **与四时态衔接**：烂醉标签挂 TRANSIENT 非 secret（公开体态——旁人看得见醉汉）→ visible_tags 自动进身份标签行；余波"把柄被攥"标签挂 TRANSIENT 且 secret=True（隐秘心理——只有当事双方知道）→ 不进 visible_tags，唯一 prompt 出口是 decision 层【把柄】行（沿 fortune 参数先例显式注入）——**公开体态走自动管道、隐秘心理走显式注入**，两标签两通道各归其位。
+- **到期熄灭**：TTL 归零自动出桶 → visible_tags 不再含 → prompt 恢复逐字节原样；互斥锁不涉（MUTEX_RULES 仅 acquire 触发，瞬态不参与）。
+
+#### 2. 复用设计（逐项点名既有管道，禁止发明平行机制——共线性死穴）
+
+| 复用对象 | 既有设施（文件:函数） | T6 消费点 |
+|---|---|---|
+| 敌意前缀管道 | `background_npc.py:75 HOSTILE_PREFIXES` 三条池 + `_social_prefix` 敌意优先判定 + 计数取模轮转 | 勒索得手后关系恶化的文案出口：同一文案池、同一轮转模式扩消费点到**核心 NPC 垫话层**（`_social_prefix` 对 actor=="player" 返回空串的条款说明背景层不适用玩家——核心垫话层是正当新消费点，非平行机制） |
+| tavern_sun 跨对话记忆 | 记忆模板+长期直写（`memory.py:135` importance≥0.7）+ `context_for` 检索 + 【相关长期记忆】渲染（`decision.py:150`），`tests/test_tavern_memory.py` 5 用例锁定 | 醉酒失态/勒索事件的次晨记忆引用；同地点全量感知链路（`npc.py:_on_event`）让"掌柜的记得谁的酒品差、谁被要挟过"——人设"记性好，村里消息大半从他嘴里传开"的兑现 |
+| 快慢脑分流 | `fast_brain.py INTENT_RULES` 六意图+presence | **裁定：醉酒/勒索意图不进快脑**。依据：①快脑域=高频封闭日常句式，劝酒/勒索是低频戏剧对话，强行规则化误伤面大（快脑保守匹配纪律：token 基线 4 句不得命中）；②醉酒可感知出口已由垫话变体+交易拒绝+慢脑标签三通道覆盖，快脑零增量；③新增意图稀释接管率统计口径（61.5% 非固化采样度量）。快脑零改动，仅加醉前缀装饰 |
+| 文案池确定性轮转 | 反应模板轮换/`HABIT_TEMPLATES`/前缀池同构的计数取模 | 失态文案池、醉话半泄露池、垫话醉变体池、勒索成交文案池——全部同构轮转 |
+| TagLedger 瞬态桶 | `tag_mount.py:280/299/314` | 烂醉 4h + 把柄被攥 24h 两标签共用同一生命周期机制（同管道=共线性纪律最优） |
+| 记忆模板注册表+点名感知 | `memory.py:135` templates + `npc.py:166-171` seller/buyer 点名先例 | 失态/勒索事件自带模板（importance 0.75/0.9）+ victim 键点名感知——照抄交易事件接入模式 |
+| 手动库存转移防双事件 | `engine.py:297 player_buys` 手动转移 | 封口物转移（不经 transfer_item 防 item_given 双事件双记账） |
+| 关系网敌意渲染 | `relationships.py:81-84` affinity<-0.3 → "敌意 X.X" | 勒索后【人际关系】行零改动直接渲染敌意 |
+| WealthLedger 模式 | `economics.py` 订阅者+单一来源建账+离散标签唯一出口 | 醉账（IntoxicationLedger）对齐订阅者结构；封口物 apply_loss 联动损失标签——经济心理层零新机制 |
+| EWMA"显著才注入"先例 | `decision.py:100-104` fortune 空时逐字节全等 | 【把柄】行注入同构：无勒索史恒空 → prompt 逐字节不变 |
+
+**六情边界（共线性纪律，硬边界）**：饮酒的情绪语义已由 item_given 的荀子六情"好"矢量独占（赠酒=送礼）；醉账与勒索判定是独立规则层，**严禁再改任何 8D 心智参数**（同一事件双份情绪增量=两套情绪系统漂移死穴）。醉账/勒索模块零 `inner_state` import（ast 架构边界断言，沿 `tests/test_economics.py` 与 `tests/test_trade.py` 先例）。
+
+#### 3. token 成本账
+
+- **全程 0-token（Tier 0 纯规则）**：酒账累计/醉度计算/TTL 递减/瞬态挂载与注销/勒索判定与知情登记/封口物转移/关系恶化/全部确定性文案（成交/拒绝/失态/醉话/垫话变体/敌意前缀）/事件发布与记忆模板——不持有任何 LLM 引用、不组装 prompt（对齐 WealthLedger/HabitLoop 封印纪律，且比 WealthLedger 更严：连离散标签出口都走 TagLedger 既有管道，不自建）。
+- **进 prompt 的部分（事件门控，参照 EWMA"显著才注入"先例）**：
+  1. 烂醉标签 → 身份标签行 +1 label："、烂醉如泥" = **5 字符**（仅烂醉 4h 窗口内每轮慢脑对话，自动管道零新代码）；
+  2. 余波【把柄】行："【把柄】私铸劣币（命门被攥，惊惧交加）" = **20 字符**（最坏口径：把柄 label 上限 4 字——暗夜杀人/私铸劣币/私生血统/勾结外敌/巨额亏空全 4 字；括注 10 字含全角标点；仅余波 24h 内慢脑轮注入，decision 层 leverage 参数对齐 fortune 参数签名先例）；
+  3. 失态/勒索记忆 → 【相关长期记忆】检索命中才进（top_k=3 既有封顶，不新增行数）。
+  最坏单轮叠加（被勒索后又烂醉的罕见态）：+5+20 = **25 字符（≈17 token）**，各行独立计均远守 <35token 红线（现行红线最坏封顶 36 字符口径，`tests/test_inner_state.py:365,414`）。
+- **与 token 基线 4519 的关系**：默认村庄无赠饮（玩家不赠米酒）→ 酒账恒零 → 瞬态桶恒空 → visible_tags 不变；无勒索 → leverage 恒空 → 【把柄】行恒不出现——**prompt 逐字节全等，PINNED 4519 不变**（沿交易 API"空路径逐字节全等+基线不变性测试锁"先例，`tests/test_token_baseline_deterministic.py` 同口径新增断言）。
+
+#### 4. 验收标准（玩家可感知口径，参照 T5"交易心理可感知"执法风格）
+
+1. **醉酒分叉可感知（真实数据驱动）**：同量赠饮，酒量差的 tavern_sun（2.84）第 3 碗烂醉 vs 酒量好的 chen（5.90）第 5 碗才倒——prompt 内容级断言：烂醉后身份标签行含"烂醉如泥"，未醉对照不含（酒量属性驱动，无手写名单）。
+2. **瞬态生命周期**：烂醉标签 4 小时到期自动熄灭（tick 推进 4h 后 visible_tags 不含、prompt 恢复基线字节）；烂醉期再赠酒 TTL 覆盖重置；`ledger.tick()` 同 hour 判重（一天 144 tick 只走 24 步）。
+3. **烂醉行为出口三通道**：①交易拒绝（player_buys 返回 drunk 拒绝+确定性文案）；②垫话/快脑醉变体（filler 含醉话、快脑前缀"（打着酒嗝）"）；③次晨跨对话记忆引用（次日对话 prompt【相关长期记忆】含失态模板产物，对照组无饮酒则无——复用 test_tavern_memory.py 对照断言模式防词面巧合）。
+4. **勒索端到端**：醉话泄露→知情→player_blackmails 成立→封口物真实转移（NPC 库存→玩家背包）+ apply_loss 联动"最近手头紧"（经济心理闭环）+ 敌意边 affinity<0 断言 + 余波标签挂载；余波期对话【把柄】行注入（prompt 内容级）+ 垫话敌意前缀确定性轮转断言。
+5. **泄底防护（对抗预告条款直接回应）**：无勒索史的核心 NPC 日常对话 prompt 零把柄内容——全 prompt 不含 SECRET_POOL 五条标签文案的内容级断言（防"把柄泄底进日常 prompt"隐性回归，沿 tag_mount docstring 泄底防护设计意图）。
+6. **0-token 基线不变性**：默认场景 prompt 逐字节全等 + PINNED 4519 维持。
+7. **架构边界**：醉账/勒索模块零 `inner_state` import（ast 断言）+ 交易前后 8D 逐项不变（饮酒情绪已由六情独占，醉账严禁双写）+ 勒索全程 LLM call_count==0 断言。
+
+#### 5. 排期与依赖
+
+- **T5 收口状态**：三小步全落地（10-14 HabitLoop / 10-15 EWMA / 10-16 交易 API+损失域+禀赋，655 全绿，token 4519 多连平），余项仅损失域豪赌——依赖交易频率真实数据先行观察（T6 窗口按余力一并建模），**T6 启动不阻塞**。
+- **PAD 并窗依赖切分**：第一、二小步**零 PAD 依赖**（不碰 8D、不用 temperament_table、垫话用现行 3 掩码）；依赖 PAD 的子项——醉后显性脾气精细切换（规范 8 节"重度醉酒→脾气暴躁"的 PAD 分区判定，需 8 掩码接线）与"惭辱"脾气（规范 2.4"罪行/把柄被触及"社交支线，`temperament_table.py` 偏离记录 1 明示留待与把柄账本组合判定）——列 PAD 裁定后增强批，不进最小闭环。
+- **实施顺序建议**：**第一小步醉酒结算先行**（瞬态 TTL 接线是勒索余波标签的地基；tavern_sun 酒量 2.84+米酒默认在库，默认场景即可端到端演示；预计单迭代段 ~25-30 用例）→ **第二小步勒索最小闭环**（复用第一小步瞬态管道+敌意边出口，~20-25 用例）→ 第三小步评估批（醉后脾气精细分区[PAD]/信物通道/损失域豪赌——按前两步真实使用数据决定，诚实排期非承诺债）。
+
+#### 6. 远期展望（一句话）
+
+远期（本周期不实施）：把柄知情面经传闻失真树在 NPC 间扩散与 NPC 互相勒索，仅在玩家侧勒索/醉酒真实使用数据证明玩法被触达后评估。
+
+
 ### 架构图重画硬清单（T3 执行，2026-10-07 固化；2026-10-10 22:00 已重画完成）
 
 > 审查指令（10-06 第六次审查指令 3 + 10-09 第九次指令 3）要求：`docs/architecture.png` 重画必须覆盖以下组件，缺项判文档失同步。

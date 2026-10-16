@@ -104,6 +104,11 @@ _KIN_RELATION_TYPES = frozenset({
     "父亲", "母亲", "儿子", "女儿", "妻子", "丈夫",
 })
 
+# 公开别名（第十四次审查指令 2 / engine/socialize.py 社交回路消费）：
+# 血缘类型集合单一来源导出——socialize 从这里 import 家人池分派类型，
+# 禁止复制第二份集合（两套血缘类型集合漂移=共线性死穴）。零行为变化。
+KIN_RELATION_TYPES = _KIN_RELATION_TYPES
+
 
 class BackgroundNPC:
     """背景 NPC：只有身份+一句概括+关系，不跑 LLM，事件触发纯规则反应。

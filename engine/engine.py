@@ -20,6 +20,7 @@ from .llm import create_provider
 from .llm.base import BaseLLMProvider
 from .npc import NPC, Persona
 from .relationships import RelationshipNetwork
+from .socialize import SocialLoop
 from .states import NPCState
 from .village_genesis import env_mind_for, generate_village, load_newcomer_configs
 from .world import Entity, World, WorldEvent
@@ -107,6 +108,11 @@ class NPCEngine:
         # 行为与无 HabitLoop 等价，向后兼容）
         self._habit_loop = HabitLoop(self.world, self.background_npcs,
                                      self.relationships)
+        # 第十四次审查指令 2：NPC 间社交回路（活村庄社会生态最小闭环，
+        # 0-token 纯规则；relationships 空网/None 时零互动，行为与无
+        # SocialLoop 等价，向后兼容）
+        self._social_loop = SocialLoop(self.world, self.background_npcs,
+                                       self.relationships)
 
     @staticmethod
     def _load_bg_configs(config_dir: str = DEFAULT_BG_CONFIG_DIR) -> List[dict]:
@@ -354,6 +360,10 @@ class NPCEngine:
         # T5 第一小步：黄昏酒馆习惯回路（在作息状态落地后消费 IDLE 段；
         # 熄灯不归位——19/20/21 点由各 NPC SLEEPING 作息移动接管）
         self._habit_loop.apply(self.world.hour)
+        # 第十四次审查指令 2：NPC 间社交回路（调用顺序：先习惯聚集落位、
+        # 后社交扫描同地对——黄昏酒馆聚集把常客拉到同一地点后，同地
+        # 关系边才可被社交闸门扫描命中）
+        self._social_loop.apply(self.world.hour)
         return {"clock": self.world.clock, "tick": self.world.tick_count,
                 "schedule_applied": applied}
 

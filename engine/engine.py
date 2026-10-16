@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 from .background_npc import BackgroundNPC
 from .economics import WealthLedger, cn_amount, endowment_price, estimate_value
 from .habit import HabitLoop
+from .intoxication import DRUNK_REFUSAL, IntoxicationLedger, is_dead_drunk
 from .llm import create_provider
 from .llm.base import BaseLLMProvider
 from .npc import NPC, Persona
@@ -75,7 +76,19 @@ class NPCEngine:
         for _npc_id, _profile in generate_village().items():
             self.wealth_ledger.ensure_account(_npc_id, _profile.innate.wealth)
         self.world.bus.subscribe(self.wealth_ledger.on_event,
-                                 kinds=["item_given", "item_bought", "item_sold"])
+                                  kinds=["item_given", "item_bought", "item_sold"])
+
+        # T6 第一小步：醉酒账本（Tier 0 纯规则零 token）。全村 25 人酒量档案
+        # 单一来源 generate_village() 的 profile.innate.alcohol_tol（沿
+        # WealthLedger.ensure_account 先例零新增配置）；订阅 item_given。
+        # 默认村庄无赠饮 → 酒账恒零 → 瞬态桶恒空 → prompt 逐字节不变（token 基线 4519）。
+        self.intoxication_ledger = IntoxicationLedger(self.world, self.npcs)
+        for _npc_id, _profile in generate_village().items():
+            self.intoxication_ledger.ensure_tolerance(_npc_id, _profile.innate.alcohol_tol)
+        self.world.bus.subscribe(self.intoxication_ledger.on_event, kinds=["item_given"])
+        # T6 第一小步：瞬态标签生命周期泵（"有桶无泵"修复）。构造锚定当前
+        # 小时——首个同小时 tick 不递减，TTL 从挂载后的下一次小时变更起算。
+        self._last_tag_tick_hour = self.world.hour
 
         for persona in (npc_configs if npc_configs is not None else Persona.load_all()):
             self.spawn(persona)
@@ -196,8 +209,9 @@ class NPCEngine:
 
         # 1.5) 垫话：慢脑 LLM 调用前同步返回的反应性开场白
         #      （0-token 本地计算，不注入 LLM prompt；消费的是
-        #      「听到玩家说话」后的反应性 8D 状态）
-        filler = npc.filler_engine.generate(npc.inner_state)
+        #      「听到玩家说话」后的反应性 8D 状态）。T6 第一小步：烂醉
+        #      NPC 走垫话醉变体池（醉态覆盖脾气常态，filler.py 消费）。
+        filler = npc.filler_engine.generate(npc.inner_state, drunk=is_dead_drunk(npc))
 
         # 1.6) 快脑：高频日常意图规则匹配命中 → 构造 SPEAK 直接执行
         #      （0 LLM 调用）。SLEEPING 的 NPC 不放行快脑——交慢脑既有
@@ -295,6 +309,9 @@ class NPCEngine:
         """
         if npc_id not in self.npcs:
             return {"ok": False, "reason": "unknown npc"}
+        # T6 第一小步：烂醉交易拒绝（三通道之一）。确定性文案零 LLM 零事件。
+        if is_dead_drunk(self.npcs[npc_id]):
+            return {"ok": False, "reason": "drunk", "reply": DRUNK_REFUSAL}
         src = self.world.entities[npc_id]
         if item not in src.inventory:
             return {"ok": False, "reason": "out_of_stock"}
@@ -326,6 +343,9 @@ class NPCEngine:
         """
         if npc_id not in self.npcs:
             return {"ok": False, "reason": "unknown npc"}
+        # T6 第一小步：烂醉交易拒绝（三通道之一）。确定性文案零 LLM 零事件。
+        if is_dead_drunk(self.npcs[npc_id]):
+            return {"ok": False, "reason": "drunk", "reply": DRUNK_REFUSAL}
         price = estimate_value(item)
         player_inv = self.world.entities["player"].inventory
         if item in player_inv:
@@ -364,6 +384,16 @@ class NPCEngine:
         # 后社交扫描同地对——黄昏酒馆聚集把常客拉到同一地点后，同地
         # 关系边才可被社交闸门扫描命中）
         self._social_loop.apply(self.world.hour)
+        # T6 第一小步：瞬态 TTL 泵接线（同 hour 判重，沿 EnvMind
+        # _last_evolved_hour 同构模式——10 分钟粒度一天 144 次 tick 只走
+        # 24 步）；TTL 单位约定 = 1 次 ledger.tick() = 1 世界小时。
+        # tick() 返回的到期标签本步无消费者（未来宿醉回调入口），忽略返回值。
+        if self.world.hour != self._last_tag_tick_hour:
+            self._last_tag_tick_hour = self.world.hour
+            for npc in self.npcs.values():
+                ledger = getattr(npc, "tag_ledger", None)
+                if ledger is not None:
+                    ledger.tick()
         return {"clock": self.world.clock, "tick": self.world.tick_count,
                 "schedule_applied": applied}
 

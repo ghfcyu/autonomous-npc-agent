@@ -15,6 +15,10 @@
   （npc.inner_state）——只查一方即为「性格与状态两张皮」，审查点名打回。
   实现三层叠加：意图内容模板（消费世界信息）× 掩码语气前缀（按 8D
   状态带选前缀，状态带口径与 filler.py 完全一致）。
+- T6 第一小步：烂醉 NPC 的快脑回复前置酒嗝前缀（intoxication.
+  FAST_DRUNK_PREFIX）——日常句快脑照常秒回（醉汉也能答「在，何事？」），
+  醉汉答报时只是带酒嗝；PM 裁定同 filler：醉态覆盖脾气常态，未醉
+  路径逐字节不变。
 - 意图内容模板全部玩家可感知（问路给真实方向、报时给 world.clock、
   查价按商品词对齐经营范围给报价、presence 确认在场答「在，何事？」），
   无掩码用中性变体（向后兼容）。
@@ -34,6 +38,7 @@ from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple
 
 from .actions import Action, ActionType
 from .economics import ITEM_VALUES, cn_amount, endowment_price
+from .intoxication import FAST_DRUNK_PREFIX, is_dead_drunk
 
 if TYPE_CHECKING:  # 仅为类型注解服务，避免运行期循环导入
     from .inner_state import InnerState
@@ -408,5 +413,9 @@ class FastBrain:
         if maker is None:
             return ""
         content = maker(npc, world, self.last_query)
-        prefix = _tone_prefix(npc.persona.temperament, npc.inner_state)
+        # T6 第一小步：烂醉 NPC 前置酒嗝前缀——日常句快脑照常秒回
+        # （醉汉也能答"在，何事？"），醉汉答报时只是带酒嗝。PM 裁定同
+        # filler：醉态覆盖脾气常态；未醉路径逐字节不变。
+        prefix = (FAST_DRUNK_PREFIX if is_dead_drunk(npc)
+                  else _tone_prefix(npc.persona.temperament, npc.inner_state))
         return prefix + content

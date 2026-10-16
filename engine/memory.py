@@ -141,6 +141,11 @@ class MemorySystem:
             "entity_moved": ("{actor} 离开了", 0.2),
             "weather_changed": ("天气变成了 {weather}", 0.2),
             "npc_action": ("自己做了：{summary}", 0.3),
+            # T6 第一小步：重度醉酒失态——victim（actor==self 点名分支）与同地
+            # 目击者双路径同模板；第三人称旁观中立措辞（T6 裁定：新事件种类
+            # 不继承 npc_action"自己做了"的 observer 视角瑕疵）；0.75 ≥ 0.7
+            # 长期直写（次晨记得自己失态 / 掌柜记得谁的酒品差）。
+            "npc_drunk": ("{summary}", 0.75),
             "env_event": ("环境事件：{summary}", 0.5),
             # 外观变化：importance 0.3 < 0.7，「眼睛不是记忆」——不直写长期记忆
             "appearance_change": ("看到 {actor}{summary}", 0.3),

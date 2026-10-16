@@ -136,6 +136,59 @@ class TestTokenBaselineDeterministic(unittest.TestCase):
             low <= total <= high,
             f"token 总消耗 {total} 超出审查硬标准 {low}-{high}")
 
+    def test_baseline_scenario_prompts_no_drunk_injection(self):
+        """T6 醉酒机制默认惰性（旁证）：基线场景全部 prompt 不含"烂醉如泥"。
+
+        默认村庄无赠饮 → 酒账恒零 → 瞬态桶恒空 → 身份标签行零醉酒
+        注入——PINNED 4519 逐字节成立的内容级旁证（机制默认零注入，
+        ARCHITECTURE.md T6 提案 3 节"prompt 逐字节全等"的测试锁）。
+
+        场景配方与 scripts/token_baseline.py main() 完全一致：
+        random.seed(42) + 24 次 tick(60) + 同 4 句核心对话——对话清单
+        直接复用脚本模块的 CORE_DIALOGUES 常量（不复制清单，防两套
+        场景漂移），仅把 MockLLMProvider 换成同款捕获子类以取得
+        prompt 文本，测的仍是复跑口径本身。
+
+        引擎依赖（NPCEngine / engine.intoxication.DRUNK_LABEL）在本
+        方法内延迟 import：engine/intoxication.py 未就位时仅本方法红
+        （并行时序预期内），既有基线断言不受牵连。
+        """
+        from engine.engine import NPCEngine
+        from engine.intoxication import DRUNK_LABEL
+        from engine.llm.mock import MockLLMProvider
+
+        class _RecordingMock(MockLLMProvider):
+            """捕获完整 messages 的 Mock（RecordingLLM 同款装配，
+            本方法自持一份，避免跨测试文件耦合）。"""
+
+            def __init__(self, **kwargs):
+                super().__init__(**kwargs)
+                self.captured = []
+
+            def chat(self, messages, temperature=0.7):
+                self.captured.append([dict(m) for m in messages])
+                return super().chat(messages, temperature=temperature)
+
+        module = _load_baseline_module()
+        random.seed(42)  # 与 token_baseline.main() 同一 seed 口径
+        llm = _RecordingMock()
+        engine = NPCEngine(llm=llm)
+        for _ in range(24):
+            engine.tick(60)
+        for text, npc_id in module.CORE_DIALOGUES:
+            engine.player_says(text, npc_id)
+
+        self.assertGreaterEqual(
+            len(llm.captured), len(module.CORE_DIALOGUES),
+            msg="基线核心对话应全部走慢脑捕获 prompt（配方一致性前置）")
+        for pair in llm.captured:
+            for message in pair:
+                self.assertNotIn(
+                    DRUNK_LABEL, message["content"],
+                    msg=f"默认场景（无赠饮）prompt 不应含 {DRUNK_LABEL!r}"
+                        f"——醉酒机制默认零注入；片段: "
+                        f"{message['content'][:120]!r}")
+
 
 if __name__ == "__main__":
     unittest.main()

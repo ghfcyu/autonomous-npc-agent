@@ -150,6 +150,9 @@ class NPC:
         交易按"点名"语义无视距离必可闻（自己的买卖自己必记得，与
         player_spoke 的 to 键同构）。本改动是交易事件接入记忆链路
         （MemorySystem.observe 模板）的最小兼容，其余事件感知行为零变化。
+        T6 第二小步：勒索事件（blackmail）payload 用 victim 键——被
+        勒索的 NPC 点名感知无视距离（被要挟终身记得谁拿住过自己），
+        同地目击者走同地过滤（村里大事瞒不过掌柜）。
         """
         # 自己产出的动作
         if event.kind == "npc_action" and event.payload.get("npc") == self.persona.id:
@@ -167,6 +170,10 @@ class NPC:
             self.memory.observe(event)
             return
         if event.kind == "item_sold" and event.payload.get("buyer") == self.persona.id:
+            self.memory.observe(event)
+            return
+        # 点名事件：勒索（T6 第二小步）——victim 指向自己，无视距离
+        if event.kind == "blackmail" and event.payload.get("victim") == self.persona.id:
             self.memory.observe(event)
             return
         if event.actor == self.persona.id:

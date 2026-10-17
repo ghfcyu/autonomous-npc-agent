@@ -8,8 +8,13 @@
 - 垫话必须同时消费「脾气掩码」与「8D 当下状态」——只查脾气不查状态
   即为「性格与状态两张皮」，审查点名打回。
 - T6 第一小步：烂醉 NPC 走醉变体池 DRUNK_FILLERS（engine/intoxication
-  提供，每条 ≤15 字符），醉态覆盖脾气常态（PM 裁定：烂醉的 NPC 不再
-  分暴躁喜悦，只有醉话）；未醉路径逐字节不变（默认参数向后兼容）。
+   提供，每条 ≤15 字符），醉态覆盖脾气常态（PM 裁定：烂醉的 NPC 不再
+   分暴躁喜悦，只有醉话）；未醉路径逐字节不变（默认参数向后兼容）。
+- T6 第二小步：勒索余波期敌意前缀——HOSTILE_PREFIXES 池复用
+   （engine/background_npc 同一文案池零平行机制），冷哼轮转每次
+   说话甩冷脸；PM 裁定优先级 drunk > hostile > 脾气常态：烂醉连话
+   都说不清何谈记仇甩脸，记仇的不再热络寒暄只有冷脸；未 hostile
+   路径逐字节不变（默认参数向后兼容）。
 - 状态带阈值同源：lambda 全部引用 engine/inner_state.py 的 BAND_*
   常量（同一心理现象一套阈值，消除阈值共线性；数值不变，行为零变化）。
 - 每条垫话模板 ≤15 token（按字符数计）。
@@ -20,9 +25,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Callable, Dict, List, Tuple
 
 from .inner_state import (BAND_AROUSAL_HIGH, BAND_DOMINANCE_HIGH,
-                          BAND_FATIGUE_HIGH, BAND_PLEASURE_HIGH,
-                          BAND_PLEASURE_LOW, BAND_STRESS_HIGH)
+                           BAND_FATIGUE_HIGH, BAND_PLEASURE_HIGH,
+                           BAND_PLEASURE_LOW, BAND_STRESS_HIGH)
 from .intoxication import DRUNK_FILLERS
+from .background_npc import HOSTILE_PREFIXES
 
 if TYPE_CHECKING:  # 仅为类型注解服务，避免运行期循环导入
     from .inner_state import InnerState
@@ -57,15 +63,21 @@ class FillerEngine:
         self.temperament_id = temperament_id
         # T6 第一小步：醉变体轮转计数（DRUNK_FILLERS 池按取模轮转）
         self._drunk_count = 0
+        # T6 第二小步：敌意前缀轮转计数（HOSTILE_PREFIXES 池按取模轮转）
+        self._hostile_count = 0
 
-    def generate(self, inner_state: "InnerState", drunk: bool = False) -> str:
+    def generate(self, inner_state: "InnerState", drunk: bool = False,
+                 hostile: bool = False) -> str:
         """根据脾气掩码与 8D 当下状态生成垫话。
 
         - drunk=True：从 DRUNK_FILLERS 按计数取模轮转（返回后计数 +1），
           忽略脾气掩码（PM 裁定：醉态覆盖脾气常态——烂醉的 NPC 不再
           分暴躁喜悦，只有醉话）；
-        - drunk=False：掩码路径逐字节不变（默认参数向后兼容，既有调用
-          与测试零改动）；
+        - hostile=True（且未烂醉）：从 HOSTILE_PREFIXES 按计数取模轮转
+          （返回后计数 +1），冷哼轮转每次说话甩冷脸（T6 第二小步：
+          勒索余波期敌意前缀，池复用背景层同一文案源）；
+        - drunk=False 且 hostile=False：掩码路径逐字节不变（默认参数
+          向后兼容，既有调用与测试零改动）；
         - 无掩码（空串或未注册）返回空串（向后兼容，不影响既有 NPC）。
         - 命中掩码后按规则顺序匹配首个 True 的状态带，返回对应垫话。
         - 垫话 ≤15 字符（token）。
@@ -73,6 +85,14 @@ class FillerEngine:
         if drunk:
             text = DRUNK_FILLERS[self._drunk_count % len(DRUNK_FILLERS)]
             self._drunk_count += 1
+            return text
+        if hostile:
+            # T6 第二小步：勒索余波期敌意前缀（HOSTILE_PREFIXES 池复用，冷哼轮转
+            # ——每次说话甩冷脸）。PM 裁定优先级 drunk > hostile > 脾气常态：
+            # 烂醉连话都说不清何谈记仇甩脸；记仇的不再热络寒暄，只有冷脸。
+            # 每条前缀 ≤7 字符（实测池最大"（把脸别过去）"=7；垫话 ≤15 字符纪律内）。
+            text = HOSTILE_PREFIXES[self._hostile_count % len(HOSTILE_PREFIXES)]
+            self._hostile_count += 1
             return text
         if not self.temperament_id:
             return ""

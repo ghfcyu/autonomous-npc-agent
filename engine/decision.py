@@ -3,7 +3,9 @@
 流程
 ----
 1. 硬规则前置：睡觉中的 NPC 直接产出梦呓回退动作，不调用 LLM。
-2. 上下文组装：人格卡 → 记忆上下文 → 世界快照 → 玩家输入 → 输出契约。
+2. 上下文组装：人格卡 → 记忆上下文 → 世界快照 → 玩家输入 → 输出契约
+   （T6 第二小步：勒索余波期追加【把柄】行，leverage 空时
+   逐字节不变）。
 3. LLM 生成结构化 JSON 动作。
 4. 解析 + 白名单校验；任何失败都落到人格 fallback_bank 的安全回退。
 
@@ -17,6 +19,7 @@ import re
 from typing import Any, Dict, Optional
 
 from .actions import Action, ActionType, ActionValidator
+from .blackmail import leverage_line
 from .llm.base import BaseLLMProvider, LLMError
 from .relationships import RelationshipNetwork
 from .world import APPEARANCE_KEY_CN, World
@@ -87,7 +90,15 @@ class DecisionEngine:
 
     def _user_prompt(self, player_input: str, world: World,
                      memory_ctx: Dict[str, list], snapshot: Dict[str, Any],
-                     inner_state=None, fortune: str = "") -> str:
+                     inner_state=None, fortune: str = "",
+                     leverage: str = "") -> str:
+        """组装 user prompt：记忆 → 世界快照 → 内心/把柄行 → 玩家输入。
+
+        fortune/leverage 均为离散注入（空串时逐字节不变，基线不变性）：
+        fortune=WealthLedger.fortune_tag 财富显著带标签（T5）；
+        leverage=blackmail.leverage_line 勒索余波【把柄】行（T6 第二
+        小步，对齐 fortune 参数签名先例）。
+        """
         long_term = "\n".join(f"- {m}" for m in memory_ctx.get("long_term", [])) or "（无）"
         recent = "\n".join(f"- {m}" for m in memory_ctx.get("recent", [])) or "（无）"
         state_line = ""
@@ -102,6 +113,10 @@ class DecisionEngine:
             if fortune:
                 tags = [t for t in tags if t != "心境平稳"] + [fortune]
             state_line = f"【此刻内心】{'、'.join(tags)}\n"
+        # T6 第二小步：勒索余波期【把柄】行（blackmail.leverage_line 离散注入，
+        # 对齐 fortune 参数签名先例）。leverage 为空时本行不出现——prompt 与
+        # 接线前逐字节全等（基线不变性）。
+        leverage_line_str = f"{leverage}\n" if leverage else ""
         # 周围的人：同地点可见的实体及其外观（空 nearby 不注入，控 token）。
         # T4-a token 裁剪之一：25 NPC 落地后同地点密度上升护栏——先按
         # viewer（persona.id）与各实体的关系亲缘度 |affinity| 降序稳定
@@ -134,6 +149,7 @@ class DecisionEngine:
             f"你在 {snapshot.get('my_location')}\n"
             f"{nearby_line}"
             f"{state_line}"
+            f"{leverage_line_str}"
             f"【玩家说】{player_input}"
         )
 
@@ -163,10 +179,13 @@ class DecisionEngine:
         wealth_ledger = getattr(npc, "wealth_ledger", None)
         fortune = (wealth_ledger.fortune_tag(npc.persona.id)
                    if wealth_ledger is not None else "")
+        # T6 第二小步：勒索余波【把柄】行（leverage_line 空=未勒索/已熄灭/无账本，
+        # prompt 零把柄内容——泄底防护由“标签即门控”结构保证）
+        leverage = leverage_line(npc)
         # T2：挂载了标签账本的 NPC 注入身份标签行（getattr 兼容未挂载实例）
         messages = [
             {"role": "system", "content": self._system_prompt(getattr(npc, "tag_ledger", None))},
-            {"role": "user", "content": self._user_prompt(player_input, world, memory_ctx, snapshot, npc.inner_state, fortune)},
+            {"role": "user", "content": self._user_prompt(player_input, world, memory_ctx, snapshot, npc.inner_state, fortune, leverage)},
         ]
 
         # 2) LLM 生成 + 解析

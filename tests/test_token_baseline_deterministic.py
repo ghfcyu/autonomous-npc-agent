@@ -189,6 +189,94 @@ class TestTokenBaselineDeterministic(unittest.TestCase):
                         f"——醉酒机制默认零注入；片段: "
                         f"{message['content'][:120]!r}")
 
+    def test_blackmail_default_prompt_unchanged(self):
+        """T6 第二小步勒索机制默认惰性：基线场景 prompt 逐字节不变 +
+        token 总消耗恒为 PINNED 基线（勒索层默认零行为零 token）。
+
+        默认村庄无赠饮 → 无醉话泄露 → player_knowledge 恒空 → 无勒索
+        → 余波标签恒不挂载 → 【把柄】行恒不出现——ARCHITECTURE.md T6
+        提案 3 节"无勒索 → leverage 恒空 → prompt 逐字节全等、PINNED
+        4519 不变"的勒索侧测试锁。
+
+        场景配方与 test_baseline_scenario_prompts_no_drunk_injection
+        完全一致（random.seed(42) + 24 次 tick(60) + CORE_DIALOGUES 4
+        句，对话清单复用脚本模块常量，仅把 MockLLMProvider 换成同款
+        捕获子类以取得 prompt 文本），测的仍是复跑口径本身。
+
+        断言三层：①全部 prompt（system+user）不含"【把柄】"行标记与
+        余波标签"把柄被攥"（勒索层默认零注入的内容级旁证）；②全程零
+        blackmail/secret_mumbled 事件、player_knowledge 恒空（默认零
+        行为）；③llm.call_count 恰 4 且 total_tokens_used ==
+        PINNED_TOTAL_TOKENS——Mock 计费按 prompt 字符长度，总量与
+        PINNED 严格相等即基线场景输出与冻结口径逐字节一致的数量级
+        强锁（勒索层零 token）。
+
+        引擎依赖（engine.blackmail 契约常量）在本方法内延迟 import：
+        engine/blackmail.py 未就位时仅本方法红（并行时序预期内），既有
+        基线断言不受牵连。
+        """
+        from engine.blackmail import LEVERAGED_LABEL
+        from engine.engine import NPCEngine
+        from engine.llm.mock import MockLLMProvider
+
+        class _RecordingMock(MockLLMProvider):
+            """捕获完整 messages 的 Mock（RecordingLLM 同款装配，
+            本方法自持一份，避免跨测试文件耦合）。"""
+
+            def __init__(self, **kwargs):
+                super().__init__(**kwargs)
+                self.captured = []
+
+            def chat(self, messages, temperature=0.7):
+                self.captured.append([dict(m) for m in messages])
+                return super().chat(messages, temperature=temperature)
+
+        module = _load_baseline_module()
+        random.seed(42)  # 与 token_baseline.main() 同一 seed 口径
+        llm = _RecordingMock()
+        engine = NPCEngine(llm=llm)
+        for _ in range(24):
+            engine.tick(60)
+        for text, npc_id in module.CORE_DIALOGUES:
+            engine.player_says(text, npc_id)
+
+        self.assertGreaterEqual(
+            len(llm.captured), len(module.CORE_DIALOGUES),
+            msg="基线核心对话应全部走慢脑捕获 prompt（配方一致性前置）")
+        # ① 内容级：全部 prompt 零勒索注入（【把柄】行标记 + 余波标签）
+        for pair in llm.captured:
+            for message in pair:
+                self.assertNotIn(
+                    "【把柄】", message["content"],
+                    msg=f"默认场景（无赠饮无勒索）prompt 不应含【把柄】行"
+                        f"——勒索机制默认零注入；片段: "
+                        f"{message['content'][:120]!r}")
+                self.assertNotIn(
+                    LEVERAGED_LABEL, message["content"],
+                    msg=f"默认场景 prompt 不应含余波标签 "
+                        f"{LEVERAGED_LABEL!r}；片段: "
+                        f"{message['content'][:120]!r}")
+        # ② 默认零行为：零勒索/零醉话泄露事件、知情恒空
+        kinds = {e.kind for e in engine.world.bus.history}
+        self.assertNotIn(
+            "blackmail", kinds,
+            msg="默认场景不得出现 blackmail 事件（勒索层零行为）")
+        self.assertNotIn(
+            "secret_mumbled", kinds,
+            msg="默认场景不得出现 secret_mumbled 事件（无赠饮零泄露）")
+        self.assertEqual(
+            set(engine.blackmail_ledger.player_knowledge), set(),
+            msg="默认场景 player_knowledge 应恒空（知情即筹码零登记）")
+        # ③ token 逐字节强锁：调用数恰 4、总消耗与 PINNED 严格相等
+        self.assertEqual(
+            llm.call_count, len(module.CORE_DIALOGUES),
+            msg="基线场景 LLM 调用数应恰为核心对话数（勒索层零 LLM）")
+        self.assertEqual(
+            llm.total_tokens_used, PINNED_TOTAL_TOKENS,
+            f"勒索层默认零注入下 token 总消耗应为 {PINNED_TOTAL_TOKENS}"
+            f"（PINNED 基线逐字节不变），实际 {llm.total_tokens_used}"
+            f"——若为合法变更请同步更新 PINNED_TOTAL_TOKENS 与文档口径")
+
 
 if __name__ == "__main__":
     unittest.main()

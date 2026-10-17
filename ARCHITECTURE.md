@@ -503,9 +503,13 @@ EventBus 发布 npc_action {summary, npc, with, relation}
 - **验收标准（审查验收口径）**：①payload 的 `with`/`relation` 两键为「断言互动双方与关系边类型」的数据出口（测试逐事件断言双方与关系类型）；②玩家可感知——status() recent_events 可见互动文案（含双方名）；③五层闸门逐条正反用例（亲和含 0 边界/范围含自环与核心排除/判重含双向边与同 hour/位置/状态含 None 与 SLEEPING）；④文案池分派（含徒弟边走师父视角池、未映射兜底、跨天轮转确定性）；⑤day 回绕判重（23→0 后同对可再互动）；⑥relationships=None 零行为向后兼容；⑦背景 NPC 零 LLM。验收见 `tests/test_social_interaction.py`（6 测试类 33 用例：闸门/分派/日界/None 兼容/最小夹具端到端/默认村庄全天基线）。
 
 
-### 把柄与瞬态玩法层 v2：T6 启动提案（审查 14 指令 3②，2026-10-16 书面化；**第一小步已于 2026-10-17 04:00 落地**）
+### 把柄与瞬态玩法层 v2：T6 启动提案（审查 14 指令 3②，2026-10-16 书面化；**第一小步 2026-10-17 04:00 / 第二小步 2026-10-17 22:00 相继落地**）
 
-> **实施进度（2026-10-17 04:00）**：第一小步醉酒结算最小闭环已落地——`engine/intoxication.py` `IntoxicationLedger`（1.2 节设计照本实施：alcohol_tol 单一来源消费/烂醉碗数 `ceil(4×tol/5)`/TTL 4 小时瞬态标签/三通道可感知出口/次晨失态记忆）+ 1.3 节"有桶无泵"修复（`NPCEngine.tick` 同 hour 判重接线 `ledger.tick()`）。验收 1-7 全达成：49 新用例（test_intoxication 29 + test_drunk_behavior 19 + token 基线惰性断言 1）、737 全绿、token 基线 4519 零影响（默认场景 prompt 逐字节全等）、六情边界 ast 断言、泄底防护内容级断言。第二小步勒索最小闭环（1.1 节）待下一迭代段。以下提案原文保留为设计冻结版。
+> **实施进度（2026-10-17 22:00 更新）**：T6 主体两小步全部落地。
+> **第一小步（10-17 04:00）醉酒结算最小闭环**——`engine/intoxication.py` `IntoxicationLedger`（1.2 节设计照本实施：alcohol_tol 单一来源消费/烂醉碗数 `ceil(4×tol/5)`/TTL 4 小时瞬态标签/三通道可感知出口/次晨失态记忆）+ 1.3 节"有桶无泵"修复（`NPCEngine.tick` 同 hour 判重接线 `ledger.tick()`），49 新用例 737 全绿。
+> **第二小步（10-17 22:00）勒索最小闭环**——`engine/blackmail.py` `BlackmailLedger`（1.1 节数据流照本实施：醉话半泄露 `secret_mumbled` 事件[DRUNK_LEAKS 按把柄 tag_id 配池，玩家同地才泄露]→知情登记 `player_knowledge`→`player_blackmails` 勒索入口[no_leverage/already_leveraged 确定性守卫，知情保留复用 TTL 生命周期]→结算四件套[封口物估值最高手动转移/apply_loss 损失联动/敌意边 -1.0/"把柄被攥" secret 瞬态 24h——隐秘心理走 decision 层【把柄】行显式注入，与烂醉公开体态走 visible_tags 自动管道两标签两通道各归其位]→余波三通道玩家可感知[【把柄】行 19 字符 prompt 内容级/垫话 HOSTILE_PREFIXES 池复用冷哼轮转/敌意边]）+ blackmail 事件 importance 0.9 长期直写（victim 点名+同地目击，memory/npc 双接线）。验收 4-7 全达成：52 新用例（test_blackmail 28 + test_blackmail_behavior 23 + token 基线惰性断言 1）、789 全绿、token 基线 4519 零影响（默认场景 prompt 逐字节全等）、六情边界 ast 断言+8D 增量恰等于既有 npc_action 通道增量断言、泄底防护内容级断言（知情≠余波：未勒索的 NPC prompt 零把柄行）。
+> **实施勘误与已知边界（PM 10-17 22:00 书面登记）**：①【把柄】行实测 19 字符（【把柄】4+label ≤4+括注 11），提案 3 节"20 字符"为预估口径勘误——最坏叠加烂醉标签 +5+19=24 字符仍在 <35token 红线内；②敌意渲染带弱可达——默认场景知情必经灌酒×3，六情"好"矢量先行 +0.3（0.5→0.8），勒索 -1.0 后落 -0.2 不进 <-0.3 敌意渲染带（B 子代理实测发现，且 tavern_sun 的 player 边 |affinity| 低被【人际关系】top-3 截断）；敌意渲染出口由垫话冷脸+【把柄】行双通道覆盖玩家可感知，敌意 floor 语义（一次勒索不低于 -0.5）留待后续裁定不数字修补；③勒索对烂醉 NPC 不拒（醉态不阻断物品利益类交互只阻断买卖谈判，与快脑醉前缀照常报价同口径）。
+> 余项：第三小步评估批（醉后脾气精细分区[PAD 裁定后增强批]/信物通道/损失域豪赌——按前两步真实使用数据决定，诚实排期非承诺债）。以下提案原文保留为设计冻结版。
 
 > T6「把柄博弈与瞬态」预研书面化：把柄勒索 + 醉酒结算（酒量属性→重度醉酒 TTL 瞬态标签）+ 瞬态标签生命周期。核心结论先行：**所有基础设施均已就位且有测试**——把柄账本（`TagLedger.secrets()`，3 核心 NPC 各挂 1 条 rare 把柄）、瞬态 TTL 桶（`tag_mount.py:280 add_transient` + `:299 tick()`，`tests/test_tag_mount.py:204` 已用"重度醉酒"做生命周期测试）、酒量属性（`tag_genesis.py:27 alcohol_tol`，25 人值已生成）、敌意前缀管道（`background_npc.py HOSTILE_PREFIXES`）、tavern_sun 跨对话记忆（`tests/test_tavern_memory.py` 5 用例锁定）。唯一真实缺口是**引擎侧从未调用 `ledger.tick()`**（瞬态生命周期"有桶无泵"）与**核心 NPC 对玩家的敌意文案出口无消费点**（`_social_prefix` 对 actor=="player" 显式返回空串）。实施待 T5 收口后按余力；本提案为设计冻结版，对抗执法口径（玩家可感知+真实数据驱动）逐条预答。
 

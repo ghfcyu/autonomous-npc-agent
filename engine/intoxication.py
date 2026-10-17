@@ -57,6 +57,13 @@ DRUNK_FAILURES = ("{name}喝得烂醉如泥，趴在桌上不省人事",
                   "{name}醉得东倒西歪，扶着桌子直打晃")    # 失态事件 summary 模板，按 victim 计数取模轮转，{name}=persona.name
 DRUNK_FILLERS = ("（舌头打结）嗝……说、说啥？",
                  "（趴在桌上）嗝……有、有事？")           # 垫话醉变体池（filler.py 消费；每条 ≤15 字符，垫话纪律）
+DRUNK_LEAKS: Dict[str, str] = {   # 醉话半泄露池（T6 第二小步；按把柄 tag_id 索引，SECRET_POOL 五条全覆盖）
+    "secret_murderer": "（醉眼迷离）枯井……骨头……别、别告发……",
+    "secret_forged_coin": "（打嗝）地窖……铅钱……谁、谁知道……",
+    "secret_illegitimate_heir": "（醉笑）丫头……可是皇家血脉……",
+    "secret_collusion": "（压低声音）布防图……我送、送出去过……",
+    "secret_deficit": "（哭腔）账上……全、全空了……呜……",
+}
 FAST_DRUNK_PREFIX = "（打着酒嗝）"                       # 快脑醉前缀（fast_brain.py 消费）
 
 
@@ -165,10 +172,16 @@ class IntoxicationLedger:
         3. 失态文案按 victim 计数取模轮转 DRUNK_FAILURES，{name} 以
            npc.persona.name 填充，计数 +1；
         4. 发布 npc_drunk 事件（actor=victim npc_id）——victim 经
-           npc._on_event 的 event.actor==self.persona.id 点名分支感知，
-           同地目击者经同地过滤感知（掌柜记得谁的酒品差），均走
-           MemorySystem.observe 的 npc_drunk 模板 0.75 ≥ 0.7 长期直写。
-           与 item_given 不同 kind，嵌套发布不迭代同一订阅列表。
+            npc._on_event 的 event.actor==self.persona.id 点名分支感知，
+            同地目击者经同地过滤感知（掌柜记得谁的酒品差），均走
+            MemorySystem.observe 的 npc_drunk 模板 0.75 ≥ 0.7 长期直写。
+            与 item_given 不同 kind，嵌套发布不迭代同一订阅列表。
+        5. 醉话半泄露（T6 第二小步）：玩家同地在场 + victim 有把柄 → 发布
+            secret_mumbled 事件（醉话文案按把柄 tag_id 查 DRUNK_LEAKS
+            池）。BlackmailLedger 订阅登记 player_knowledge（知情即
+            筹码）；memory.observe 无该 kind 模板 → NPC 零记忆写入
+            （泄底防护：victim 与目击者都不知道醉话内容，唯一感知者
+            是事件流 recent_events 中的玩家）。
         """
         npc_id = npc.persona.id
         ledger = getattr(npc, "tag_ledger", None)
@@ -185,3 +198,19 @@ class IntoxicationLedger:
         self._world.bus.publish(WorldEvent(
             self._world.tick_count, "npc_drunk", npc_id,
             {"summary": text, "npc": npc_id}))
+        # 5. 醉话半泄露（T6 第二小步）：玩家同地在场 + victim 有把柄 → 发布
+        #    secret_mumbled 事件（醉话文案按把柄 tag_id 查 DRUNK_LEAKS 池）。
+        #    BlackmailLedger 订阅登记 player_knowledge（知情即筹码）；memory.observe
+        #    无该 kind 模板 → NPC 零记忆写入（泄底防护：victim 与目击者都不知道
+        #    醉话内容，唯一感知者是事件流 recent_events 中的玩家）。玩家不同
+        #    地/无账本把柄/tag_id 不在池 → 零行为（醉汉说胡话未必句句见血）。
+        if (self._world.entities["player"].location_id
+                == npc.entity.location_id and ledger is not None):
+            innate_secrets = [s for s in ledger.secrets()
+                              if s.phase == TagPhase.INNATE]
+            if innate_secrets:
+                leak_text = DRUNK_LEAKS.get(innate_secrets[0].tag_id)
+                if leak_text is not None:
+                    self._world.bus.publish(WorldEvent(
+                        self._world.tick_count, "secret_mumbled", npc_id,
+                        {"npc": npc_id, "text": leak_text}))

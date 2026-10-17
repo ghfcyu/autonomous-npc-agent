@@ -146,6 +146,10 @@ class MemorySystem:
             # 不继承 npc_action"自己做了"的 observer 视角瑕疵）；0.75 ≥ 0.7
             # 长期直写（次晨记得自己失态 / 掌柜记得谁的酒品差）。
             "npc_drunk": ("{summary}", 0.75),
+            # T6 第二小步：勒索成交——victim（payload["victim"] 点名分支）与同地目击者
+            # 双路径同模板（第三人称中立 summary 由发布方拼好）；0.9 ≥ 0.7 长期直写
+            # （被勒索是重大事件，终身记得谁拿住过自己）。
+            "blackmail": ("{summary}", 0.9),
             "env_event": ("环境事件：{summary}", 0.5),
             # 外观变化：importance 0.3 < 0.7，「眼睛不是记忆」——不直写长期记忆
             "appearance_change": ("看到 {actor}{summary}", 0.3),

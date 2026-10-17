@@ -1,4 +1,4 @@
-<mxGraphModel dx="1600" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1640" pageHeight="1660" math="0" shadow="0">
+    <mxGraphModel dx="1600" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1640" pageHeight="1770" math="0" shadow="0">
   <root>
     <mxCell id="0" />
     <mxCell id="1" parent="0" />
@@ -13,7 +13,7 @@
     <mxCell id="4" value="World 世界状态&#10;时间 · 天气 · 地点 · 物品&#10;Entity.appearance&#10;(outfit/posture/expression)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11" vertex="1" parent="1">
       <mxGeometry x="90" y="150" width="260" height="120" as="geometry" />
     </mxCell>
-    <mxCell id="5" value="EventBus 事件总线&#10;发布/订阅 · 事件历史&#10;player_spoke / item_given&#10;item_bought / item_sold（T5 交易）&#10;env_event / appearance_change&#10;npc_action / npc_drunk（T6 失态）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11" vertex="1" parent="1">
+    <mxCell id="5" value="EventBus 事件总线&#10;发布/订阅 · 事件历史&#10;player_spoke / item_given&#10;item_bought / item_sold（T5 交易）&#10;env_event / appearance_change&#10;npc_action / npc_drunk（T6 失态）&#10;secret_mumbled / blackmail（T6 勒索）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11" vertex="1" parent="1">
       <mxGeometry x="380" y="150" width="300" height="120" as="geometry" />
     </mxCell>
     <mxCell id="6" value="EventSlot 随机事件槽&#10;+5% 累积 → 满 100% 触发&#10;env_event&#10;（世界自发事件）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11" vertex="1" parent="1">
@@ -280,12 +280,51 @@
         </Array>
       </mxGeometry>
     </mxCell>
-<mxCell id="96" value="把柄与瞬态玩法层（T6 第一小步 · IntoxicationLedger · 0-token 纯规则）" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=13;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
-          <mxGeometry x="460" y="1510" width="380" height="120" as="geometry" />
+<mxCell id="96" value="把柄与瞬态玩法层（T6 第一+二小步 · Intoxication/Blackmail · 0-token 纯规则）" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=13;fontStyle=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4" vertex="1" parent="1">
+          <mxGeometry x="460" y="1510" width="380" height="220" as="geometry" />
         </mxCell>
-<mxCell id="97" value="IntoxicationLedger 醉账（engine/intoxication.py）&#10;烂醉碗数=ceil(4×酒量/5) · add_transient 烂醉如泥 TTL 4h&#10;TTL 泵: NPCEngine.tick 同 hour 判重（1 次=1 世界小时）&#10;三通道: 身份标签行自动携带 / 交易拒绝 / 垫话·快脑醉变体&#10;npc_drunk 失态事件 → victim+同地目击长期记忆 · 零 8D" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;fontSize=10" vertex="1" parent="1">
+<mxCell id="97" value="IntoxicationLedger 醉账（engine/intoxication.py）&#10;烂醉碗数=ceil(4×酒量/5) · add_transient 烂醉如泥 TTL 4h&#10;TTL 泵: NPCEngine.tick 同 hour 判重（1 次=1 世界小时）&#10;三通道: 身份标签行自动携带 / 交易拒绝 / 垫话·快脑醉变体&#10;醉话半泄露 secret_mumbled（玩家同地在场才发布）· 零 8D" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;fontSize=10" vertex="1" parent="1">
           <mxGeometry x="480" y="1552" width="340" height="72" as="geometry" />
         </mxCell>
+<mxCell id="99" value="BlackmailLedger 勒索账本（engine/blackmail.py）&#10;知情登记 player_knowledge · player_blackmails 入口守卫（no_leverage/already_leveraged）&#10;结算四件套: 封口物(估值最高手动转移) · apply_loss · 敌意边-1.0 · 把柄被撛 secret 24h&#10;余波三通道: 【把柄】行显式注入 · 垫话冷脸(HOSTILE_PREFIXES 复用) · 敌意边&#10;blackmail 事件 → victim 点名+同地目击长期直写 0.9 · 零 8D" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="480" y="1640" width="340" height="72" as="geometry" />
+        </mxCell>
+<mxCell id="e99" value="烂醉结算（玩家同地）→ secret_mumbled 醉话半泄露 → 知情登记" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#999999;fontSize=10;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0" edge="1" parent="1" source="97" target="99">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+<mxCell id="e100" value="余波【把柄】行 19 字符显式注入（空=逐字节不变）" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#999999;fontSize=10;exitX=0.47;exitY=0;exitDx=0;exitDy=0;entryX=0;entryY=0.9;entryDx=0;entryDy=0" edge="1" parent="1" source="96" target="28">
+          <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="640" y="1060" />
+          <mxPoint x="640" y="997" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+<mxCell id="e101" value="封口物 apply_loss 损失联动（估值最高者手动转移）" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#999999;fontSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0" edge="1" parent="1" source="96" target="82">
+          <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="1600" y="1570" />
+          <mxPoint x="1600" y="747" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+<mxCell id="e102" value="敌意边 -1.0（勒索记仇 · 客人→翻脸）" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#b85450;fontSize=10;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=0;entryY=1;entryDx=0;entryDy=0" edge="1" parent="1" source="96" target="12">
+          <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="15" y="1600" />
+          <mxPoint x="15" y="570" />
+          <mxPoint x="880" y="570" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+<mxCell id="e103" value="blackmail 事件回流（victim 点名+同地目击 → 长期直写 0.9）" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;strokeColor=#888888;fontSize=10;exitX=0;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.95;entryDx=0;entryDy=0" edge="1" parent="1" source="96" target="3">
+          <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="35" y="1540" />
+          <mxPoint x="35" y="337" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
 <mxCell id="e96" value="item_given（含酒物品）→ 碗数累计 · 达阈值烂醉结算" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#999999;fontSize=10;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0" edge="1" parent="1" source="5" target="96">
           <mxGeometry relative="1" as="geometry">
         <Array as="points">

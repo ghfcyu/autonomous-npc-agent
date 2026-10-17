@@ -14,6 +14,7 @@ import random
 from typing import Any, Dict, List, Optional
 
 from .background_npc import BackgroundNPC
+from .blackmail import BlackmailLedger, is_leveraged
 from .economics import WealthLedger, cn_amount, endowment_price, estimate_value
 from .habit import HabitLoop
 from .intoxication import DRUNK_REFUSAL, IntoxicationLedger, is_dead_drunk
@@ -86,7 +87,14 @@ class NPCEngine:
         for _npc_id, _profile in generate_village().items():
             self.intoxication_ledger.ensure_tolerance(_npc_id, _profile.innate.alcohol_tol)
         self.world.bus.subscribe(self.intoxication_ledger.on_event, kinds=["item_given"])
-        # T6 第一小步：瞬态标签生命周期泵（"有桶无泵"修复）。构造锚定当前
+        # T6 第二小步：勒索账本（Tier 0 纯规则零 token）。知情登记经
+        # secret_mumbled 事件驱动（醉话半泄露→玩家知情）；勒索结算经
+        # player_blackmails 门面入口。默认村庄无赠饮无勒索 → 知情恒空 →
+        # 【把柄】行恒不出现 → prompt 逐字节不变（token 基线 4519）。
+        self.blackmail_ledger = BlackmailLedger(self.world, self.npcs,
+                                                self.wealth_ledger, self.relationships)
+        self.world.bus.subscribe(self.blackmail_ledger.on_event, kinds=["secret_mumbled"])
+        # T6 第一小步：瞬态标签生命周期泵（“有桶无泵”修复）。构造锚定当前
         # 小时——首个同小时 tick 不递减，TTL 从挂载后的下一次小时变更起算。
         self._last_tag_tick_hour = self.world.hour
 
@@ -210,8 +218,10 @@ class NPCEngine:
         # 1.5) 垫话：慢脑 LLM 调用前同步返回的反应性开场白
         #      （0-token 本地计算，不注入 LLM prompt；消费的是
         #      「听到玩家说话」后的反应性 8D 状态）。T6 第一小步：烂醉
-        #      NPC 走垫话醉变体池（醉态覆盖脾气常态，filler.py 消费）。
-        filler = npc.filler_engine.generate(npc.inner_state, drunk=is_dead_drunk(npc))
+        #      NPC 走垫话醉变体池；T6 第二小步：勒索余波期敌意前缀
+        #      （drunk > hostile > 脾气常态，filler.py 消费）。
+        filler = npc.filler_engine.generate(npc.inner_state, drunk=is_dead_drunk(npc),
+                                            hostile=is_leveraged(npc))
 
         # 1.6) 快脑：高频日常意图规则匹配命中 → 构造 SPEAK 直接执行
         #      （0 LLM 调用）。SLEEPING 的 NPC 不放行快脑——交慢脑既有
@@ -358,6 +368,22 @@ class NPCEngine:
             {"buyer": npc_id, "item": item, "price": price}))
         return {"ok": True, "item": item, "to": npc_id, "price": price,
                 "reply": f"「{item}我收下了，{cn_amount(price)}两付你。」"}
+
+    # ------------------------------------------------------------------ #
+    def player_blackmails(self, npc_id: str) -> Dict[str, Any]:
+        """玩家持把柄要挟某个核心 NPC（T6 第二小步：勒索最小闭环入口）。
+
+        判定链全部在 blackmail.BlackmailLedger.blackmail（薄壳门面，对齐
+        player_buys 先例）：无知情/无把柄 → no_leverage 确定性回绝；余波
+        24h 内重复勒索 → already_leveraged 回绝。结算四件套（封口物手动
+        转移/apply_loss 损失联动/敌意边 -1.0/余波 secret 瞬态标签 24h）+
+        双事件（blackmail 点名+同地目击 / npc_action 成交动作）。
+        烂醉不拒（PM 裁定：醉态不阻断物品利益类交互只阻断买卖谈判——
+        与快脑醉前缀照常报价同口径，醉汉被拿住把柄更狼狈）。
+        """
+        if npc_id not in self.npcs:
+            return {"ok": False, "reason": "unknown npc"}
+        return self.blackmail_ledger.blackmail(npc_id)
 
     # ------------------------------------------------------------------ #
     def player_changes_appearance(self, changes: Dict[str, str]) -> bool:
